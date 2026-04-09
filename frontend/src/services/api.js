@@ -59,7 +59,9 @@ export const forgeApi = {
 
 // ── Task Shatterer ────────────────────────────────────────────────────────────
 export const shatterApi = {
+  coachBreakdown: (task, blocker, userId)   => postAI('/shatter/breakdown', { task, userId, blocker }),
   breakdown: (task, userId)            => postAI('/shatter/breakdown', { task, userId }),
+  syncTimeline: (userId, taskId, timeline)  => post('/shatter/sync-timeline', { userId, taskId, timeline }),
   complete:  (userId, taskId, questId) => post('/shatter/complete', { userId, taskId, questId }),
   abandon:   (userId, taskId)          => post('/shatter/abandon', { userId, taskId }),
   getActive: (userId)                  => get(`/shatter/active/${userId}`),

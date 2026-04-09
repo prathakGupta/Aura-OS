@@ -10,6 +10,7 @@
 //     fire the onDistracted callback so the UI shows the SVG avatar warning.
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import useStore from '../store/useStore.js';
 
 const THRESHOLD_MS = 8_000; // 8 seconds away = trigger body double
 
@@ -18,6 +19,7 @@ export default function useFocusTimer({ isTaskActive, onDistracted, onReturned }
   const audioRef         = useRef(null);
   const hiddenAtRef      = useRef(null);
   const distractedRef    = useRef(false);
+  const { audioMuted, isAuraSpeaking } = useStore();
 
   // ── Brown noise setup ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -37,12 +39,19 @@ export default function useFocusTimer({ isTaskActive, onDistracted, onReturned }
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (isTaskActive && noiseEnabled) {
+    if (!audioMuted && isTaskActive && noiseEnabled) {
       audio.play().catch(() => {}); // autoplay policies – silent fail is fine
     } else {
       audio.pause();
     }
-  }, [isTaskActive, noiseEnabled]);
+  }, [isTaskActive, noiseEnabled, audioMuted]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    // Lower background noise while Aura voice is speaking to avoid overlap fatigue.
+    audio.volume = isAuraSpeaking ? 0.08 : 0.35;
+  }, [isAuraSpeaking]);
 
   const toggleNoise = useCallback(() => {
     setNoiseEnabled((prev) => !prev);

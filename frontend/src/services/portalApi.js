@@ -30,6 +30,10 @@ export const clinicalApi = {
   // Called on "too overwhelming" selection in TaskShatter
   triggerAlert:    (body)     => req('POST', '/trigger-alert',  body, AI_TIMEOUT),
 
+  // Full session report generation + optional guardian dispatch
+  sessionReport:   (body)     => req('POST', '/session-report', body, AI_TIMEOUT),
+  reportPdfUrl:    (reportId) => `${BASE}/session-report/${reportId}/pdf`,
+
   // Guardian setup
   setGuardian:     (body)     => req('POST', '/guardian',       body),
 

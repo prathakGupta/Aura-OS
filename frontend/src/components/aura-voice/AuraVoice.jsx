@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Wind, Activity, Zap } from 'lucide-react';
+import { Mic, MicOff, Wind, Activity, Zap, Volume2, VolumeX } from 'lucide-react';
 import useStore from '../../store/useStore.js';
 import useAudioStream from '../../hooks/useAudioStream.js';
 
@@ -71,7 +71,15 @@ const PULSE_DELAYS = [0,0.4,0.8,1.2,1.6,2.0,0.3,0.9,1.5,0.6,1.8,2.4,0.2,1.1,2.1,
 export default function AuraVoice() {
   const canvasRef = useRef(null);
   const [error, setError] = useState(null);
-  const { isListening, auraEmotion, auraTranscript, auraResponse } = useStore();
+  const {
+    isListening,
+    auraEmotion,
+    auraTranscript,
+    auraResponse,
+    audioMuted,
+    isAuraSpeaking,
+    setAudioMuted,
+  } = useStore();
   const { start, stop } = useAudioStream();
 
   const em = EMOTIONS[auraEmotion] || EMOTIONS.calm;
@@ -128,6 +136,28 @@ export default function AuraVoice() {
           Aura reads the sound of your voice — not just your words.<br/>
           It meets you exactly where you are.
         </p>
+        <div style={{marginTop:14,display:'flex',justifyContent:'center'}}>
+          <button
+            onClick={() => setAudioMuted(!audioMuted)}
+            style={{
+              display:'inline-flex',
+              alignItems:'center',
+              gap:8,
+              border:'1px solid rgba(0,229,255,0.28)',
+              background: audioMuted ? 'rgba(255,107,138,0.12)' : 'rgba(0,229,255,0.08)',
+              color: audioMuted ? '#ffb3c1' : '#80deea',
+              borderRadius:999,
+              padding:'9px 14px',
+              fontSize:12,
+              fontWeight:700,
+              letterSpacing:'0.03em',
+              cursor:'pointer',
+            }}
+          >
+            {audioMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            {audioMuted ? 'Voice muted' : 'Voice enabled'}
+          </button>
+        </div>
       </div>
 
       {/* ═══════════════ LIVING CIRCUIT ORB ═══════════════ */}
@@ -271,6 +301,11 @@ export default function AuraVoice() {
           : 'Tap the orb to speak with Aura'
         }
       </motion.p>
+      {isAuraSpeaking && !audioMuted && (
+        <p style={{ fontSize: 12, color: '#80deea', marginTop: -16, marginBottom: 18 }}>
+          Aura is speaking...
+        </p>
+      )}
 
       <canvas ref={canvasRef} width={0} height={0} style={{display:'none'}}/>
 
@@ -326,3 +361,5 @@ export default function AuraVoice() {
     </div>
   );
 }
+
+

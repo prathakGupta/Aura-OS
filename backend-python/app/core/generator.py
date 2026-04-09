@@ -12,7 +12,14 @@ except Exception:
     client = None
 
 def generate_insight(transcribed_text: str, emotion_label: str) -> str:
-    if not client or len(transcribed_text) < 3: return ""
+    if len(transcribed_text) < 3:
+        return ""
+    if not client:
+        if emotion_label == "high_anxiety":
+            return "I hear a stress spike. Let's do one tiny step and one slow breath."
+        if emotion_label == "mild_anxiety":
+            return "You are carrying a lot right now; pick the smallest next action and start there."
+        return "You're doing okay. Keep going one step at a time."
 
     prompt = f"""
     User said: "{transcribed_text}"

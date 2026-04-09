@@ -7,6 +7,8 @@ import {
   setGuardianHandler,
   getDashboardMetricsHandler,
   generateTherapyBriefHandler,
+  generateSessionReportHandler,
+  downloadSessionReportPdfHandler,
 } from '../controllers/clinicalCtrl.js';
 
 const router = express.Router();
@@ -26,5 +28,9 @@ router.get('/dashboard/:userId',asyncHandler(getDashboardMetricsHandler));
 
 // Therapy brief generation
 router.post('/therapy-brief',   asyncHandler(generateTherapyBriefHandler));
+
+// Session report generation + manual PDF download
+router.post('/session-report', asyncHandler(generateSessionReportHandler));
+router.get('/session-report/:reportId/pdf', asyncHandler(downloadSessionReportPdfHandler));
 
 export default router;

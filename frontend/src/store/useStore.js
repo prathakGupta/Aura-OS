@@ -113,11 +113,15 @@ const useStore = create((set, get) => ({
   auraEmotion: 'calm',        // 'calm' | 'mild_anxiety' | 'high_anxiety'
   auraTranscript: '',
   auraResponse: '',
+  audioMuted: false,
+  isAuraSpeaking: false,
 
   setListening: (v) => set({ isListening: v }),
   setAuraEmotion: (e) => set({ auraEmotion: e }),
   setAuraTranscript: (t) => set({ auraTranscript: t }),
   setAuraResponse: (r) => set({ auraResponse: r }),
+  setAudioMuted: (v) => set({ audioMuted: v }),
+  setAuraSpeaking: (v) => set({ isAuraSpeaking: v }),
 }));
 
 export default useStore;

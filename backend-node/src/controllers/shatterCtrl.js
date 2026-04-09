@@ -158,3 +158,57 @@ export const getTaskHistoryHandler = async (req, res) => {
   const history = (user.taskHistory || []).filter(t => t.status !== 'active').sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0,20);
   res.json({ success: true, completedCount: history.filter(t=>t.status==='completed').length, history });
 };
+
+// ── POST /api/shatter/sync-timeline ─────────────────────────────────────────
+// Persists the exact user-arranged timeline order for reporting and continuity.
+export const syncTimelineHandler = async (req, res) => {
+  const { userId, taskId, timeline } = req.body;
+
+  if (!userId || !taskId) {
+    throw new AppError('userId and taskId are required.', 400);
+  }
+  if (!Array.isArray(timeline) || timeline.length === 0) {
+    throw new AppError('timeline must be a non-empty array.', 400);
+  }
+
+  const user = await UserState.findOne({ userId });
+  if (!user) throw new AppError('User not found.', 404);
+
+  const task = user.taskHistory.find((t) => t.id === taskId);
+  if (!task) throw new AppError('Task not found.', 404);
+
+  const existingById = new Map(
+    (task.microquests || []).map((q) => [String(q.id), q])
+  );
+
+  const normalized = timeline
+    .map((q, idx) => {
+      const existing = existingById.get(String(q.id)) || null;
+      return {
+        id: idx + 1,
+        action: String(q.action || q.text || '').trim().slice(0, 300),
+        tip: String(q.tip || existing?.tip || '').trim().slice(0, 300),
+        duration_minutes: Math.min(10, Math.max(1, Number(q.duration_minutes || existing?.duration_minutes || 2))),
+        completed: Boolean(existing?.completed),
+        completedAt: existing?.completed ? existing.completedAt || new Date() : null,
+      };
+    })
+    .filter((q) => q.action.length > 0);
+
+  if (!normalized.length) {
+    throw new AppError('timeline does not contain valid quest actions.', 400);
+  }
+
+  task.microquests = normalized;
+  task.totalQuests = normalized.length;
+  task.questsCompleted = normalized.filter((q) => q.completed).length;
+
+  await user.save();
+
+  res.json({
+    success: true,
+    taskId,
+    totalQuests: task.totalQuests,
+    questsCompleted: task.questsCompleted,
+  });
+};

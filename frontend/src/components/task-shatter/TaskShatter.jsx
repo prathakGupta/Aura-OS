@@ -126,7 +126,16 @@ function FragmentCard({ frag, onPositionChange, onDelete, onTextChange, onColorC
    MAIN COMPONENT
  ════════════════════════════════════════════════════════════════ */
 export default function TaskShatter() {
-  const { userId, activeTask, setActiveTask, completeQuestLocally, clearTask, taskComplete, currentQuestIndex, setBreakingDown } = useStore();
+  const {
+    userId,
+    activeTask,
+    setActiveTask,
+    completeQuestLocally,
+    clearTask,
+    taskComplete,
+    currentQuestIndex,
+    worries,
+  } = useStore();
 
   // ── Phase state machine ──────────────────────────────────────────────────
   // 'input' | 'coaching' | 'intervention' | 'loading' | 'canvas' | 'focus' | 'done'
@@ -142,6 +151,8 @@ export default function TaskShatter() {
   const [apiTaskId,    setApiTaskId]    = useState(null);
   const [originalTask, setOriginalTask] = useState('');
   const [alertResult,  setAlertResult]  = useState(null);  // clinical alert feedback
+  const [reportBusy,   setReportBusy]   = useState(false);
+  const [reportInfo,   setReportInfo]   = useState(null);
 
   const constraintsRef = useRef(null);
   const dockRef        = useRef(null);
@@ -189,12 +200,24 @@ export default function TaskShatter() {
       // Kick off both API calls concurrently
       apiCallRef.current = Promise.all([
         shatterApi.coachBreakdown(taskText.trim(), blocker.id, userId).catch(()=>null),
-        clinicalApi.triggerAlert({
+        clinicalApi.sessionReport({
           userId,
-          taskSummary: taskText.trim(),
-          blocker:     blocker.id,
-          vocalArousal:8,
-          emotion:     'high_anxiety',
+          source: 'panic',
+          currentTask: taskText.trim(),
+          selectedBlocker: blocker.label,
+          vocalArousalScore: 8,
+          sendToGuardian: true,
+          channels: { whatsapp: true, email: true },
+          sessionSnapshot: {
+            initialAnxietyQuery: taskText.trim(),
+            shatteredWorryBlocks: worries.map((w) => ({
+              id: w.uuid || String(w.id || ''),
+              text: w.worry,
+              weight: w.weight,
+              status: w.status || 'active',
+            })),
+            notes: 'Triggered from intervention flow in TaskShatter.',
+          },
         }).catch(()=>null),
       ]);
     } else {
@@ -218,7 +241,10 @@ export default function TaskShatter() {
     setPhase('loading');
     try {
       const [shatterResult, alertRes] = await (apiCallRef.current || Promise.resolve([null, null]));
-      if (alertRes) setAlertResult(alertRes);
+      if (alertRes) {
+        setAlertResult(alertRes);
+        if (alertRes.reportId || alertRes.downloadUrl) setReportInfo(alertRes);
+      }
       if (shatterResult) {
         await _processAiResult(shatterResult);
       } else {
@@ -288,11 +314,20 @@ export default function TaskShatter() {
   }, []);
 
   // ── Launch focus mode ─────────────────────────────────────────────────────
-  const handleLaunchFocus = () => {
+  const handleLaunchFocus = async () => {
     const ordered = slots.filter(Boolean).map((fragId,i)=>{
       const f=fragments.find(fr=>fr.id===fragId);
       return f ? { id:i+1, action:f.text, tip:f.tip||"You've got this.", duration_minutes:f.duration_minutes||2, completed:false } : null;
     }).filter(Boolean);
+
+    if (apiTaskId) {
+      try {
+        await shatterApi.syncTimeline(userId, apiTaskId, ordered);
+      } catch (e) {
+        setError(e.message || 'Failed to sync timeline order.');
+      }
+    }
+
     setActiveTask({ id:apiTaskId||`local-${Date.now()}`, originalTask, microquests:ordered, totalQuests:ordered.length, questsCompleted:0 });
     setPhase('focus');
     bigConfetti();
@@ -316,12 +351,70 @@ export default function TaskShatter() {
     finally{setCompleting(false);}
   },[focusQuest,completing,userId,activeTask,focusQuests,apiTaskId,completeQuestLocally]);
 
+  const handleGenerateSessionReport = useCallback(async (sendToGuardian = false) => {
+    if (!userId) return;
+
+    const timelineMicroquests = (activeTask?.microquests || slots.filter(Boolean).map((fragId, i) => {
+      const f = fragments.find((fr) => fr.id === fragId);
+      if (!f) return null;
+      return {
+        order: i + 1,
+        id: String(f.id || i + 1),
+        action: f.text,
+        tip: f.tip || "You've got this.",
+        duration_minutes: f.duration_minutes || 2,
+        completed: false,
+      };
+    }).filter(Boolean)).map((q, idx) => ({
+      order: idx + 1,
+      id: String(q.id || idx + 1),
+      action: q.action || q.text || '',
+      tip: q.tip || '',
+      duration_minutes: q.duration_minutes || 2,
+      completed: Boolean(q.completed),
+    }));
+
+    try {
+      setReportBusy(true);
+      setError(null);
+
+      const res = await clinicalApi.sessionReport({
+        userId,
+        source: sendToGuardian ? 'panic' : 'manual',
+        taskId: apiTaskId || activeTask?.id || undefined,
+        currentTask: originalTask || taskText,
+        selectedBlocker: selectedBlocker?.label || selectedBlocker?.id || null,
+        vocalArousalScore: selectedBlocker?.id === 'too_overwhelming' ? 8 : 5,
+        sendToGuardian,
+        channels: { whatsapp: true, email: true },
+        sessionSnapshot: {
+          initialAnxietyQuery: taskText || originalTask,
+          shatteredWorryBlocks: worries.map((w) => ({
+            id: w.uuid || String(w.id || ''),
+            text: w.worry,
+            weight: w.weight,
+            status: w.status || 'active',
+          })),
+          timelineMicroquests,
+          notes: 'Generated from TaskShatter UI.',
+        },
+      });
+
+      setReportInfo(res);
+      if (res.downloadUrl) window.open(res.downloadUrl, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      setError(e.message || 'Failed to generate session report.');
+    } finally {
+      setReportBusy(false);
+    }
+  }, [userId, activeTask, slots, fragments, apiTaskId, originalTask, taskText, selectedBlocker, worries]);
+
   const handleReset = () => {
     if(activeTask) shatterApi.abandon(userId,activeTask?.id).catch(()=>{});
     clearTask();
     setPhase('input'); setFragments([]); setSlots(Array(MAX_SLOTS).fill(null));
     setTaskText(''); setApiTaskId(null); setError(null); setCoachData(null);
-    setBlocker(null); setAlertResult(null);
+    setBlocker(null); setAlertResult(null); setReportInfo(null); setReportBusy(false);
     document.body.style.filter='';
   };
 
@@ -452,7 +545,28 @@ export default function TaskShatter() {
               borderRadius:14,padding:'10px 20px',display:'flex',alignItems:'center',gap:10,
               backdropFilter:'blur(16px)'}}>
             <div style={{width:8,height:8,borderRadius:'50%',background:'#00e676',boxShadow:'0 0 8px #00e676'}}/>
-            <p style={{fontSize:12,color:'#80deea',fontWeight:600}}>Guardian alert sent · Risk: {alertResult.riskLevel}</p>
+            <p style={{fontSize:12,color:'#80deea',fontWeight:600}}>
+              {alertResult?.delivery?.whatsapp?.status === 'failed' && alertResult?.delivery?.email?.status === 'failed'
+                ? 'Guardian delivery failed (report still saved).'
+                : `Guardian triage update sent | Risk: ${alertResult.riskLevel || 'watch'}`}
+            </p>
+            {alertResult?.downloadUrl && (
+              <button
+                onClick={() => window.open(alertResult.downloadUrl, '_blank', 'noopener,noreferrer')}
+                style={{
+                  marginLeft: 6,
+                  border: '1px solid rgba(0,229,255,0.35)',
+                  background: 'rgba(0,229,255,0.08)',
+                  color: '#b8f5ff',
+                  borderRadius: 999,
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                Open PDF
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -506,6 +620,32 @@ export default function TaskShatter() {
         <motion.button className="btn btn-primary" onClick={handleReset} whileHover={{scale:1.03}} whileTap={{scale:0.97}} style={{padding:'15px 36px',fontSize:15}}>
           <Zap size={15}/> Shatter another
         </motion.button>
+        <div style={{ display:'flex', gap:10 }}>
+          <motion.button
+            className="btn btn-secondary"
+            onClick={() => handleGenerateSessionReport(false)}
+            disabled={reportBusy}
+            whileTap={{scale:0.97}}
+          >
+            {reportBusy ? 'Generating...' : 'Download Session Report'}
+          </motion.button>
+          <motion.button
+            className="btn btn-ghost"
+            onClick={() => handleGenerateSessionReport(true)}
+            disabled={reportBusy}
+            whileTap={{scale:0.97}}
+          >
+            {reportBusy ? 'Sending...' : 'Send To Guardian'}
+          </motion.button>
+        </div>
+        {reportInfo?.downloadUrl && (
+          <button
+            onClick={() => window.open(reportInfo.downloadUrl, '_blank', 'noopener,noreferrer')}
+            style={{ background:'none', border:'none', color:'#80deea', fontSize:12, cursor:'pointer' }}
+          >
+            Open latest report
+          </button>
+        )}
       </div>
     );
 
@@ -568,10 +708,19 @@ export default function TaskShatter() {
               {!completing&&<ArrowRight size={18}/>}
             </motion.button>
 
-            <div style={{display:'flex',justifyContent:'center'}}>
+            <div style={{display:'flex',justifyContent:'center',gap:10,flexWrap:'wrap'}}>
               <motion.button className="btn btn-secondary" onClick={toggleNoise} whileTap={{scale:0.95}} style={{fontSize:12,padding:'8px 18px',gap:7,display:'flex',alignItems:'center'}}>
                 {noiseEnabled?<Music size={13}/>:<VolumeX size={13}/>}
                 {noiseEnabled?'Brown noise on':'Brown noise off'}
+              </motion.button>
+              <motion.button
+                className="btn btn-ghost"
+                onClick={() => handleGenerateSessionReport(false)}
+                whileTap={{scale:0.95}}
+                disabled={reportBusy}
+                style={{fontSize:12,padding:'8px 16px'}}
+              >
+                {reportBusy ? 'Generating...' : 'Download report'}
               </motion.button>
             </div>
             {error&&<p style={{marginTop:14,fontSize:13,color:'#ffb3c1',textAlign:'center'}}>{error}</p>}
@@ -686,3 +835,4 @@ export default function TaskShatter() {
     </div>
   );
 }
+

@@ -12,9 +12,23 @@ import { useRef, useCallback, useEffect } from 'react';
 import useStore from '../store/useStore.js';
 
 const isBrowser = typeof window !== 'undefined';
-const WS_URL = isBrowser
-  ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:8000/ws/audio`
-  : null;
+
+const toWsProtocol = (protocol) => (protocol === 'https:' ? 'wss:' : 'ws:');
+
+const resolveWsUrl = (userId) => {
+  if (!isBrowser) return null;
+
+  // Optional override for production: VITE_AUDIO_WS_URL=ws://host:8000/ws/audio
+  const fromEnv = (import.meta.env.VITE_AUDIO_WS_URL || '').trim();
+  if (fromEnv) {
+    const joiner = fromEnv.includes('?') ? '&' : '?';
+    return `${fromEnv}${joiner}userId=${encodeURIComponent(userId || '')}`;
+  }
+
+  // Default path uses Vite proxy in dev and reverse-proxy in production.
+  const wsProtocol = toWsProtocol(window.location.protocol);
+  return `${wsProtocol}//${window.location.host}/ws/audio?userId=${encodeURIComponent(userId || '')}`;
+};
 
 const BUFFER_SIZE = 4096;
 const SAMPLE_RATE = 16000; // Whisper expects 16kHz
@@ -26,13 +40,27 @@ export default function useAudioStream() {
   const streamRef = useRef(null);
   const wsRef = useRef(null);
   const animFrameRef = useRef(null);
+  const ttsSourceRef = useRef(null);
+  const audioMutedRef = useRef(false);
 
   const {
+    userId,
     setListening,
     setAuraEmotion,
     setAuraTranscript,
     setAuraResponse,
+    audioMuted,
+    setAuraSpeaking,
   } = useStore();
+
+  useEffect(() => {
+    audioMutedRef.current = audioMuted;
+    if (audioMuted && ttsSourceRef.current) {
+      try { ttsSourceRef.current.stop(0); } catch (_) {}
+      ttsSourceRef.current = null;
+      setAuraSpeaking(false);
+    }
+  }, [audioMuted, setAuraSpeaking]);
 
   // ── Teardown helper ────────────────────────────────────────────────────────
   const stop = useCallback(() => {
@@ -72,6 +100,12 @@ export default function useAudioStream() {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
+
+      if (ttsSourceRef.current) {
+        try {
+          ttsSourceRef.current.stop(0);
+        } catch (_) {}
+      }
     } finally {
       processorRef.current = null;
       analyserRef.current = null;
@@ -79,9 +113,11 @@ export default function useAudioStream() {
       audioCtxRef.current = null;
       wsRef.current = null;
       animFrameRef.current = null;
+      ttsSourceRef.current = null;
+      setAuraSpeaking(false);
       setListening(false);
     }
-  }, [setListening]);
+  }, [setListening, setAuraSpeaking]);
 
   // ── Draw visualizer on canvas ──────────────────────────────────────────────
   const drawVisualizer = useCallback((canvas, analyser) => {
@@ -154,7 +190,8 @@ export default function useAudioStream() {
   const start = useCallback(
     async (visualizerCanvas) => {
       try {
-        if (!isBrowser || !WS_URL) {
+        const wsUrl = resolveWsUrl(userId);
+        if (!isBrowser || !wsUrl) {
           throw new Error('Audio stream can only start in a browser environment.');
         }
 
@@ -195,7 +232,7 @@ export default function useAudioStream() {
         silentGain.connect(audioCtx.destination);
 
         // ── WebSocket connection ──────────────────────────────────────────────
-        const ws = new WebSocket(WS_URL);
+        const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
         ws.binaryType = 'arraybuffer';
 
@@ -217,8 +254,13 @@ export default function useAudioStream() {
                 setAuraResponse(msg.text || '');
                 if (msg.emotion) setAuraEmotion(msg.emotion);
 
-                if (msg.tts_audio && audioCtxRef.current) {
+                if (typeof msg.tts_audio === 'string' && msg.tts_audio && audioCtxRef.current && !audioMutedRef.current) {
                   try {
+                    if (ttsSourceRef.current) {
+                      try { ttsSourceRef.current.stop(0); } catch (_) {}
+                      ttsSourceRef.current = null;
+                    }
+
                     const binary = atob(msg.tts_audio);
                     const bytes = new Uint8Array(binary.length);
                     for (let i = 0; i < binary.length; i++) {
@@ -231,8 +273,15 @@ export default function useAudioStream() {
                     const ttsSource = audioCtxRef.current.createBufferSource();
                     ttsSource.buffer = audioBuffer;
                     ttsSource.connect(audioCtxRef.current.destination);
+                    ttsSource.onended = () => {
+                      if (ttsSourceRef.current === ttsSource) ttsSourceRef.current = null;
+                      setAuraSpeaking(false);
+                    };
+                    ttsSourceRef.current = ttsSource;
+                    setAuraSpeaking(true);
                     ttsSource.start();
                   } catch (e) {
+                    setAuraSpeaking(false);
                     console.warn('[WS] TTS playback failed:', e?.message || e);
                   }
                 }
@@ -280,6 +329,8 @@ export default function useAudioStream() {
       setAuraEmotion,
       setAuraTranscript,
       setAuraResponse,
+      setAuraSpeaking,
+      userId,
     ]
   );
 
