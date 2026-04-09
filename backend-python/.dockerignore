@@ -1,0 +1,11 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+training/dataset/
+training/__pycache__/
+.git/
+.gitignore
