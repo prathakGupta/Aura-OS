@@ -25,7 +25,12 @@ const resolveWsUrl = (userId) => {
     return `${fromEnv}${joiner}userId=${encodeURIComponent(userId || '')}`;
   }
 
-  // Default path uses Vite proxy in dev and reverse-proxy in production.
+  // In local dev, connect directly to Python to avoid Vite WS proxy churn.
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `ws://localhost:8000/ws/audio?userId=${encodeURIComponent(userId || '')}`;
+  }
+
+  // Default path for production/reverse-proxy.
   const wsProtocol = toWsProtocol(window.location.protocol);
   return `${wsProtocol}//${window.location.host}/ws/audio?userId=${encodeURIComponent(userId || '')}`;
 };
