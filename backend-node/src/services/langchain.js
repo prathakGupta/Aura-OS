@@ -1,195 +1,170 @@
-// src/services/langchain.js  🌟 UPDATED
-// Two AI personas live here:
-//   1. breakdownTask — original micro-quest generator (unchanged)
-//   2. coachBreakdown — Aura Initiation Coach (NEW: accepts blocker context)
-//   3. generateGuardianBrief — Medical Analogy Report for parents/therapists (NEW)
+// src/services/langchain.js — Optimized v2.0
+// Improved with neuroscience-backed prompts for ADHD/anxiety support
+// Research sources: Tiimo, Inflow, EndeavorOTC, Goblin.tools methodologies
 
 import { ChatGroq } from '@langchain/groq';
 import { z } from 'zod';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
-/* ─────────────────────────────────────────────────────────────
-   SCHEMA 1 (original) — standard micro-quest list
-   Used by: breakdownTask()
-──────────────────────────────────────────────────────────────*/
+/* ── Schema 1: Standard micro-quest breakdown ──────────────────────────── */
 const MicroQuestSchema = z.object({
-  microquests: z
-    .array(
-      z.object({
-        id:               z.number().int().min(1),
-        action:           z.string().max(200).describe('Imperative, 2-minute physical action.'),
-        tip:              z.string().max(200).describe('Warm, ADHD-friendly encouragement ≤20 words.'),
-        duration_minutes: z.number().min(1).max(5).default(2),
-      })
-    )
-    .min(2)
-    .max(8),
+  microquests: z.array(z.object({
+    id:               z.number().int().min(1),
+    action:           z.string().max(200).describe('Single imperative physical action, ~2 minutes. Start with an ACTION VERB.'),
+    tip:              z.string().max(180).describe('One warm, ADHD-friendly encouragement ≤18 words. No toxic positivity.'),
+    duration_minutes: z.number().min(1).max(5).default(2),
+  })).min(2).max(8),
 });
 
-/* ─────────────────────────────────────────────────────────────
-   SCHEMA 2 (NEW) — Initiation Coach with env strategy
-   Used by: coachBreakdown()
-──────────────────────────────────────────────────────────────*/
+/* ── Schema 2: Initiation Coach (blocker-aware) ────────────────────────── */
 const InitiationCoachSchema = z.object({
-  coach_message: z.string().max(280).describe(
-    'A 2-sentence empathetic message acknowledging their SPECIFIC blocker and confirming the environment action taken.'
+  coach_message: z.string().max(260).describe(
+    '2 sentences MAX. Sentence 1: acknowledge their exact blocker with empathy. Sentence 2: confirm the environment action AuraOS is taking.'
   ),
-  environment_strategy: z
-    .enum(['brown_noise', 'deep_focus_dark', 'meditation_first', 'none'])
-    .describe(
-      'brown_noise → distracted/noisy; deep_focus_dark → brain fog/exhaustion; meditation_first → acute overwhelm; none → mild.'
+  environment_strategy: z.enum(['brown_noise', 'deep_focus_dark', 'meditation_first', 'none']).describe(
+    'brown_noise = noisy/distracted; deep_focus_dark = brain fog/tired; meditation_first = overwhelmed/frozen; none = mild friction only.'
+  ),
+  microquests: z.array(z.object({
+    id:               z.string().describe('Unique step ID, e.g. "step-1"'),
+    text:             z.string().max(180).describe('Ultra-specific 2-minute action. Start with an ACTION VERB. Mention tools/apps by name when relevant.'),
+    tip:              z.string().max(160).describe('1-sentence warm ADHD tip. Sound like a supportive friend, not a robot.'),
+    duration_minutes: z.number().min(1).max(5).default(2),
+    colorId:          z.enum(['cyan', 'purple', 'coral', 'amber', 'green']).describe(
+      'Difficulty signal for visual ADHD cue: cyan=easiest entry point, green=manageable, amber=moderate, coral=hardest. NEVER start with coral.'
     ),
-  microquests: z
-    .array(
-      z.object({
-        id:               z.string().describe('Unique string id e.g. "step-1"'),
-        text:             z.string().max(200).describe('Imperative, ultra-specific 2-minute action.'),
-        tip:              z.string().max(180).describe('Warm 1-sentence ADHD tip.'),
-        duration_minutes: z.number().min(1).max(5).default(2),
-        colorId:          z.enum(['cyan', 'purple', 'coral', 'amber', 'green'])
-                           .describe('Difficulty signal: cyan=easy, amber=medium, coral=hard'),
-      })
-    )
-    .min(3)
-    .max(6),
+  })).min(3).max(6),
 });
 
-/* ─────────────────────────────────────────────────────────────
-   SCHEMA 3 (NEW) — Guardian Medical Brief
-   Used by: generateGuardianBrief()
-──────────────────────────────────────────────────────────────*/
+/* ── Schema 3: Guardian Clinical Brief ────────────────────────────────── */
 const GuardianBriefSchema = z.object({
-  subject:              z.string().max(120).describe('Email/SMS subject line.'),
-  analogy:              z.string().max(300).describe(
-    'A single, powerful non-clinical metaphor describing the cognitive state (e.g., "computer with 40 tabs open").'
+  subject:           z.string().max(110).describe('WhatsApp/SMS subject line. Include risk emoji: 🟡 watch / 🟠 pre-burnout / 🔴 acute'),
+  analogy:           z.string().max(280).describe(
+    'ONE powerful non-clinical metaphor. Examples: "browser with 40 tabs open", "car with handbrake on", "phone at 2% battery". NO clinical jargon.'
   ),
-  vocal_analysis:       z.string().max(200).describe('1–2 sentences on vocal stress markers.'),
-  observed_pattern:     z.string().max(400).describe(
-    '2–3 sentences on what the user was struggling with and the behavioural pattern detected.'
+  vocal_analysis:    z.string().max(180).describe('1-2 sentences on observed stress markers. Use parent-friendly language.'),
+  observed_pattern:  z.string().max(380).describe(
+    '2-3 sentences: what the user attempted, what blocked them, and what this pattern indicates. Warm clinical authority.'
   ),
-  aura_action_taken:    z.string().max(250).describe(
-    'What the AuraOS system did (somatic interruption, brown noise, coach message).'
+  aura_action_taken: z.string().max(220).describe(
+    'What the AuraOS support system deployed. Frame positively. No technical jargon.'
   ),
-  parent_action:        z.string().max(300).describe(
-    'Specific, warm phrases and actions for the parent/guardian to use right now. NOT clinical jargon.'
+  parent_action:     z.string().max(280).describe(
+    'SPECIFIC phrases the parent can literally say right now. Include one direct quote in quotation marks. No jargon. Empathy-first.'
   ),
-  risk_level:           z.enum(['watch', 'pre-burnout', 'acute-distress'])
-                          .describe('Clinical triage level.'),
+  risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']).describe(
+    'watch = mild stress; pre-burnout = sustained high load, needs monitoring; acute-distress = crisis intervention warranted.'
+  ),
 });
 
-/* ─────────────────────────────────────────────────────────────
-   GROQ CLIENT FACTORY
-──────────────────────────────────────────────────────────────*/
-const makeModel = (schema, name) => {
+/* ── Groq client factory ───────────────────────────────────────────────── */
+const makeModel = (schema, name, temp = 0.38) => {
   if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY is not set.');
   const llm = new ChatGroq({
-    model:       process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
-    temperature: 0.4,
-    apiKey:      process.env.GROQ_API_KEY,
+    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+    temperature: temp,
+    apiKey: process.env.GROQ_API_KEY,
   });
   return llm.withStructuredOutput(schema, { name, strict: true });
 };
 
-/* ─────────────────────────────────────────────────────────────
-   PROMPTS
-──────────────────────────────────────────────────────────────*/
+/* ── Neuroscience-backed system prompts ────────────────────────────────── */
+
 const STANDARD_SHATTER_PROMPT = `You are an ADHD executive function coach embedded in AuraOS.
-Your user is experiencing task paralysis. Atomize the given task into the SMALLEST possible micro-steps.
-RULES:
-1. Each step = one tiny physical action completable in ~2 minutes.
-2. Start with the absolute easiest first action.
-3. No technical jargon.
-4. Each "action" is an imperative sentence (verb first).
-5. Each "tip" is warm and encouraging (≤20 words).
-6. Max 8 steps. Break only the FIRST phase if the task is large.`;
+The user is experiencing task paralysis. Your job: atomize their task into the SMALLEST possible steps.
 
-const INITIATION_COACH_PROMPT = `You are the Aura Initiation Coach — a neuro-inclusive AI partner for someone with ADHD/Anxiety.
-The user told you their specific neurological blocker. Use it to personalise EVERYTHING.
+NEUROSCIENCE RULES:
+1. Each step = ONE single physical action completable in ~2 minutes. If it takes longer, split it.
+2. Start EVERY action with a strong imperative verb (Open, Type, Click, Write, Create, Close).
+3. Make step 1 so easy it's almost laughable — lower the activation threshold to near zero.
+4. No step should require planning or decision-making — those are separate tasks.
+5. Tips must sound human and warm, ≤18 words. Avoid "just" (dismissive) and "simply" (condescending).
+6. Max 8 steps. Only break the FIRST phase of large tasks.
+7. Specific beats vague: "Open VS Code" not "Open your editor".`;
 
-ENVIRONMENT STRATEGY RULES:
-- brown_noise → user is in a noisy/distracting environment
-- deep_focus_dark → brain fog, fatigue, or cognitive overload
-- meditation_first → acute overwhelm (task feels too big/scary), used ONLY when blocker is "too_overwhelming"
-- none → mild frustration only
+const INITIATION_COACH_PROMPT = `You are the Aura Initiation Coach — a neuro-inclusive AI designed for ADHD and anxiety.
+The user told you WHY they are stuck. Use this PRECISELY in your response.
 
-COACH MESSAGE RULES:
-- Start with "I hear you." or "Got it." to confirm you received their blocker.
-- Confirm what environment action you are triggering.
-- Keep it under 2 sentences. Warm but efficient.
+ENVIRONMENT STRATEGY — choose the best fit:
+• brown_noise → noisy/distracted environment. Activates ambient brown noise.
+• deep_focus_dark → brain fog, fatigue, cognitive overload. Dims screen brightness.
+• meditation_first → acute overwhelm, task feels impossible. Breathing exercise before steps.
+• none → mild friction, no special intervention needed.
+
+COACH MESSAGE (2 sentences MAX):
+• Sentence 1: Acknowledge their blocker by name. Show you heard them. No empty affirmations.
+  Good: "Brain fog is real — your brain isn't broken, it's conserving energy."
+  Bad: "I understand you're struggling! Let's tackle this together!"
+• Sentence 2: Confirm the environment action you're triggering for them.
 
 MICROQUEST RULES:
-- Colour signal: first step = 'cyan' (easiest), escalate to 'amber' mid-way, never 'coral' for first 2 steps.
-- Each action is a single physical verb sentence. Ultra specific.
-- Tip is ≤1 sentence. Sounds like a supportive friend, not a robot.`;
+• Step 1 MUST be cyan (easiest). Never coral for first 2 steps.
+• Be hyper-specific. Name files, buttons, apps. "Go to calendar.app" not "check your calendar".
+• Tips: sound like a friend who's been there. One sentence. Normalize the struggle.
+• Duration: honest estimates. 2 min default, 1 min for tiny tasks, max 5 min.`;
 
-const GUARDIAN_BRIEF_PROMPT = `You are the AuraOS Clinical Intelligence Layer generating a Professional Guardian Triage Brief.
-This is sent to a parent, therapist, or school counselor when a stress spike is detected.
+const GUARDIAN_BRIEF_PROMPT = `You are the AuraOS Clinical Intelligence Layer writing a Guardian Triage Brief.
+This is sent to a parent, school counselor, or therapist during a detected stress spike.
 
-TONE: Clinical authority + human warmth. NOT cold. NOT patronising.
-LANGUAGE: Accessible metaphors. Avoid raw medical jargon.
-PARENT_ACTION: Give specific, phraseable sentences the parent can literally say to the child right now.
-RISK_LEVEL: Use 'watch' for mild stress, 'pre-burnout' for sustained high load, 'acute-distress' for acute crisis.
-Do NOT reveal app mechanics (no "the AI did X"). Frame all Aura actions as "the support system intervened."`;
+TONE: Clinical authority + genuine human warmth. Professional but never cold.
+LANGUAGE: Accessible metaphors. Zero medical jargon in the parent-action section.
 
-/* ─────────────────────────────────────────────────────────────
-   EXPORT 1 — Standard task breakdown (unchanged API)
-──────────────────────────────────────────────────────────────*/
+RULES:
+• parent_action must contain a DIRECT QUOTE the parent can actually say, in quotation marks.
+  Example: "Try saying: 'I see you're having a hard moment. Want to sit together for a bit?'"
+• Do NOT reveal app mechanics (no "the AI did X"). Use "the support system" instead.
+• risk_level assessment:
+  - 'watch': mild isolated stress event, normal coping capacity intact
+  - 'pre-burnout': pattern of sustained high load, needs external support
+  - 'acute-distress': crisis state, immediate intervention recommended
+• analogy must be conversational and immediately understandable to a non-technical parent.`;
+
+/* ── Export 1: Standard breakdown ─────────────────────────────────────── */
 export const breakdownTask = async (task) => {
   if (!task?.trim()) throw new Error('Task is required.');
   const model = makeModel(MicroQuestSchema, 'generate_microquests');
-  console.log(`[LangChain] Standard breakdown: "${task.substring(0, 80)}"`);
+  console.log(`[LangChain] Standard breakdown: "${task.slice(0, 80)}"`);
   const result = await model.invoke([
     new SystemMessage(STANDARD_SHATTER_PROMPT),
-    new HumanMessage(`Break this into micro-quests: "${task}"`),
+    new HumanMessage(`Break this overwhelming task into 2-minute micro-steps: "${task}"`),
   ]);
   return result.microquests;
 };
 
-/* ─────────────────────────────────────────────────────────────
-   EXPORT 2 (🌟 NEW) — Coach-aware breakdown with env strategy
-──────────────────────────────────────────────────────────────*/
+/* ── Export 2: Coach-aware breakdown ──────────────────────────────────── */
 export const coachBreakdown = async (task, blocker) => {
   if (!task?.trim()) throw new Error('Task is required.');
   const model = makeModel(InitiationCoachSchema, 'initiation_coach');
   const blockerLabel = blocker || 'not specified';
-  console.log(`[LangChain] Coach breakdown: "${task.substring(0,60)}" | blocker: ${blockerLabel}`);
+  console.log(`[LangChain] Coach breakdown: "${task.slice(0, 60)}" | blocker: ${blockerLabel}`);
   const result = await model.invoke([
     new SystemMessage(INITIATION_COACH_PROMPT),
     new HumanMessage(
-      `Task to shatter: "${task}"\nUser's neurological blocker: "${blockerLabel}"\nGenerate the coach response and micro-quests now.`
+      `Task to break down: "${task}"\nUser's blocker: "${blockerLabel}"\n\nGenerate coach response and micro-quests.`
     ),
   ]);
   return result;
 };
 
-/* ─────────────────────────────────────────────────────────────
-   EXPORT 3 (🌟 NEW) — Guardian Medical Analogy Brief
-──────────────────────────────────────────────────────────────*/
+/* ── Export 3: Guardian brief ─────────────────────────────────────────── */
 export const generateGuardianBrief = async ({
-  userName,
-  taskSummary,
-  blocker,
-  vocalArousal,
-  emotion,
-  auraAction,
-  recentPatterns,  // short text summary of last 24h behaviour
+  userName, taskSummary, blocker, vocalArousal, emotion, auraAction, recentPatterns,
 }) => {
-  const model = makeModel(GuardianBriefSchema, 'guardian_brief');
+  const model = makeModel(GuardianBriefSchema, 'guardian_brief', 0.42);
 
   const contextBlock = `
-User name: ${userName || 'the user'}
-Task they were attempting: "${taskSummary || 'unspecified task'}"
-Stated blocker: "${blocker || 'overwhelming feelings'}"
-Vocal arousal score (1-10): ${vocalArousal || 'N/A'}
+User: ${userName || 'the user'}
+Attempted task: "${taskSummary || 'unspecified'}"
+Blocker stated: "${blocker || 'overwhelm'}"
+Vocal arousal (1–10): ${vocalArousal ?? 'N/A'} — ${Number(vocalArousal) >= 8 ? 'HIGH' : Number(vocalArousal) >= 6 ? 'ELEVATED' : 'MODERATE'}
 Detected emotion: ${emotion || 'high_anxiety'}
-Action taken by AuraOS: ${auraAction || 'Somatic interruption (breathing exercise) deployed.'}
-Recent 24h pattern: ${recentPatterns || 'User has been working on stressful tasks with elevated vocal arousal.'}
+AuraOS intervention: ${auraAction || 'Somatic interruption deployed.'}
+24h pattern: ${recentPatterns || 'Elevated stress with task avoidance.'}
 `.trim();
 
-  console.log(`[LangChain] Generating Guardian Brief for user: ${userName}`);
+  console.log(`[LangChain] Guardian brief for: ${userName}`);
   const result = await model.invoke([
     new SystemMessage(GUARDIAN_BRIEF_PROMPT),
-    new HumanMessage(`Generate the Guardian Triage Brief for this situation:\n\n${contextBlock}`),
+    new HumanMessage(`Generate the Guardian Triage Brief:\n\n${contextBlock}`),
   ]);
   return result;
 };
