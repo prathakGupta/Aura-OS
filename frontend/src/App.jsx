@@ -9,6 +9,7 @@ import ErrorBoundary  from './components/ErrorBoundary.jsx';
 import AuraVoice      from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge from './components/cognitive-forge/CognitiveForge.jsx';
 import TaskShatter    from './components/task-shatter/TaskShatter.jsx';
+import Dashboard      from './components/observer-portal/Dashboard.jsx';
 
 const TABS = [
   { id:'voice',   label:'Aura',    Icon:Mic,  color:'#00e5ff' },
@@ -18,6 +19,7 @@ const TABS = [
 
 export default function App() {
   const { activeTab, setTab, initSession, isInitialized, userId, setActiveTask } = useStore();
+  const isPortalView = typeof window !== 'undefined' && window.location.pathname.startsWith('/portal');
   const [initError, setInitError] = useState(false);
   const [resumeBanner, setResumeBanner] = useState(null);
   const [isDark, setIsDark] = useState(true);
@@ -27,6 +29,7 @@ export default function App() {
   }, [isDark]);
 
   useEffect(() => {
+    if (isPortalView) return;
     const runInit = async () => {
       try {
         await initSession();
@@ -35,9 +38,10 @@ export default function App() {
       }
     };
     runInit();
-  }, [initSession]);
+  }, [initSession, isPortalView]);
 
   useEffect(() => {
+    if (isPortalView) return;
     if (!userId || !isInitialized) return;
     const restore = async () => {
       try {
@@ -52,7 +56,15 @@ export default function App() {
     };
     restore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isInitialized]);
+  }, [userId, isInitialized, isPortalView]);
+
+  if (isPortalView) {
+    return (
+      <ErrorBoundary label="Observer Portal">
+        <Dashboard />
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <div className="app">

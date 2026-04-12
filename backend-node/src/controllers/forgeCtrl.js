@@ -48,6 +48,7 @@ export const extractWorriesHandler = async (req, res) => {
   if (userId) {
     try {
       const user = await UserState.findOrCreate(userId);
+      user.ensureClinicalTelemetry?.();
       user.vaultedWorries.push(
         ...taggedWorries.map((w) => ({
           id: w.uuid,
@@ -56,6 +57,15 @@ export const extractWorriesHandler = async (req, res) => {
           status: 'active',
         }))
       );
+
+      const avgWeight = taggedWorries.length
+        ? taggedWorries.reduce((sum, w) => sum + (Number(w.weight) || 5), 0) / taggedWorries.length
+        : 5;
+      user.clinicalTelemetry.forgeSessions.push({
+        wordCount: text.trim().split(/\s+/).filter(Boolean).length,
+        worryDensity: Math.min(10, Math.max(1, Number(avgWeight.toFixed(1)) || 5)),
+        worryCount: taggedWorries.length,
+      });
       await user.save();
     } catch (dbErr) {
       // DB errors are non-fatal here – the AI result is still valid

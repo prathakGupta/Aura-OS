@@ -1,0 +1,42 @@
+# app/services/notification.py
+import smtplib
+from email.message import EmailMessage
+from twilio.rest import Client
+from app.core.config import settings
+
+def send_whatsapp_alert(guardian_number: str, message_body: str):
+    """Sends a WhatsApp alert to the guardian."""
+    try:
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        message = client.messages.create(
+            from_=settings.TWILIO_WHATSAPP_NUMBER,
+            body=message_body,
+            to=f"whatsapp:{guardian_number}"
+        )
+        print(f"WhatsApp sent successfully: {message.sid}")
+    except Exception as e:
+        print(f"Failed to send WhatsApp: {e}")
+
+def send_email_with_pdf(guardian_email: str, subject: str, body: str, pdf_path: str):
+    """Sends an email with the PDF report attached."""
+    try:
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = settings.SMTP_USERNAME
+        msg['To'] = guardian_email
+        msg.set_content(body)
+
+        # Attach PDF
+        with open(pdf_path, 'rb') as f:
+            pdf_data = f.read()
+            msg.add_attachment(pdf_data, maintype='application', subtype='pdf', filename=pdf_path.split("/")[-1])
+
+        # Send Email
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            server.send_message(msg)
+            
+        print("Email sent successfully.")
+    except Exception as e:
+        print(f"Failed to send Email: {e}")
