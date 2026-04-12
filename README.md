@@ -1,7 +1,5 @@
 # AuraOS — Your Mental Safety Net
 
-> **Vihaan DTU 9.0 Hackathon · HealthTech Track**
-
 AuraOS shifts mental health technology from **passive tracking** to **active, real-time intervention**. When a user is in a panic attack or ADHD executive dysfunction spiral, they cannot navigate complex UIs or type structured input — so we built an app that catches them exactly where they are.
 
 ---
