@@ -1,21 +1,21 @@
-from __future__ import annotations
+# app/models/schemas.py
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+class UserProfile(BaseModel):
+    user_id: str = Field(..., description="Unique ID from your frontend auth (e.g., Firebase/Clerk)")
+    name: str
+    guardian_number: str
+    guardian_email: str
 
-class AudioStressRequest(BaseModel):
-    stress_score: float = Field(..., ge=0.0, le=1.0)
+class TaskItem(BaseModel):
+    title: str
+    action: str
+    order: int = Field(..., description="The index of the card on the drag-and-drop timeline")
 
-
-class AudioStressResponse(BaseModel):
-    stress_score: float
-    label: str
-
-
-class TaskShatterRequest(BaseModel):
-    task: str = Field(..., min_length=1)
-
-
-class TaskShatterResponse(BaseModel):
-    steps: list[str]
-
+class SessionSync(BaseModel):
+    user_id: str
+    initial_query: Optional[str] = None
+    tasks: List[TaskItem] = Field(default_factory=list)
+    worries: List[str] = Field(default_factory=list)
