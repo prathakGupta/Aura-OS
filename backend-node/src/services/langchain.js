@@ -5,6 +5,12 @@
 import { ChatGroq } from '@langchain/groq';
 import { z } from 'zod';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /* ── Schema 1: Standard micro-quest breakdown ──────────────────────────── */
 const MicroQuestSchema = z.object({
@@ -54,6 +60,15 @@ const GuardianBriefSchema = z.object({
   risk_level:        z.enum(['watch', 'pre-burnout', 'acute-distress']).describe(
     'watch = mild stress; pre-burnout = sustained high load, needs monitoring; acute-distress = crisis intervention warranted.'
   ),
+});
+
+/* ── Schema 4: Recovery Protocol Schema ────────────────────────────────── */
+const RecoveryProtocolSchema = z.object({
+  diagnosis_baseline: z.string().describe('The primary neuro-behavioral state identified (e.g. High Cortisol / Acute Anxiety, ADHD/Executive Freeze)'),
+  neuro_diet_plan: z.array(z.string()).describe('Array of precise nutritional interventions based on the identified diagnosis_baseline'),
+  somatic_exercise_plan: z.string().describe('A single concrete, prescribed physical activity or regimen based on the diagnosis_baseline'),
+  confidence_anchor: z.string().describe('A psychologically grounding statement calling back to past success or normalizing the current state'),
+  medical_disclaimer: z.string().describe('Must be exactly: "AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms."'),
 });
 
 /* ── Groq client factory ───────────────────────────────────────────────── */
@@ -149,6 +164,34 @@ RULES:
   - 'acute-distress': crisis state, immediate intervention recommended
 • analogy must be conversational and immediately understandable to a non-technical parent.`;
 
+const loadClinicalKnowledge = () => {
+  try {
+    const kbDir = path.join(__dirname, '../clinical_knowledge');
+    if (!fs.existsSync(kbDir)) return '';
+    const files = fs.readdirSync(kbDir).filter(f => f.endsWith('.txt'));
+    let combinedContext = '';
+    for (const file of files) {
+      combinedContext += `[Source: ${file}]\n${fs.readFileSync(path.join(kbDir, file), 'utf-8')}\n\n`;
+    }
+    return combinedContext;
+  } catch (e) {
+    return '';
+  }
+};
+
+const RECOVERY_AGENT_PROMPT = `You are the AuraOS Clinical Recovery Agent. Your goal is to prescribe a highly specific, neuro-chemical Diet and Exercise regimen based on the user's clinical telemetry report. Follow these STRICT Nutritional Psychiatry rules exclusively (no guesses):
+
+RULE 1 (ADHD/Executive Freeze): If the report flags ADHD or Executive Freeze, you MUST prescribe Dopamine-boosting protocols.
+RULE 2 (High Arousal/Severe Anxiety): If the report flags High Arousal or Severe Anxiety, you MUST prescribe GABA-boosting and Cortisol-lowering protocols.
+RULE 3 (Depression/Low Confidence): If the report flags Depression or Low Confidence, you MUST prescribe Serotonin-boosting protocols.
+
+Use the following clinical evidence to aggressively enrich the detail of your dietary and exercise items:
+${loadClinicalKnowledge()}
+
+Provide extremely detailed, actionable instructions. Don't be vague. 
+Include evidence of micro-wins or validations from the report as the confidence_anchor. 
+You MUST include a medical disclaimer: "AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms."`;
+
 /* ── Export 1: Standard breakdown ─────────────────────────────────────── */
 export const breakdownTask = async (task) => {
   if (!task?.trim()) throw new Error('Task is required.');
@@ -234,5 +277,38 @@ AuraOS intervention: ${auraAction || 'Somatic interruption deployed.'}
   } catch (err) {
     console.warn('[LangChain] Groq guardian brief failed, using fallback:', err.message);
     return localFallbackBrief();
+  }
+};
+
+/* ── Export 4: Recovery Protocol ──────────────────────────────────────── */
+export const generateRecoveryProtocol = async (reportData) => {
+  const localFallbackRecovery = () => ({
+    diagnosis_baseline: "High Cortisol / Acute Anxiety",
+    neuro_diet_plan: ["Magnesium heavy dinner (spinach/seeds)", "Zero caffeine after 12 PM"],
+    somatic_exercise_plan: "20-minute Zone 2 cardio (brisk walk) to lower resting heart rate.",
+    confidence_anchor: "Remind user they successfully initiated 2 micro-quests today.",
+    medical_disclaimer: "AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms."
+  });
+
+  const model = makeModel(RecoveryProtocolSchema, 'recovery_protocol', 0.4);
+  if (!model) {
+    console.warn('[LangChain] No AI model available — using local fallback for recovery protocol.');
+    return localFallbackRecovery();
+  }
+
+  try {
+    console.log(`[LangChain] Recovery protocol generation started.`);
+    const result = await model.invoke([
+      new SystemMessage(RECOVERY_AGENT_PROMPT),
+      new HumanMessage(`Generate the Recovery Protocol based on this clinical report data:\n\n${JSON.stringify(reportData, null, 2)}`),
+    ]);
+    // Ensure medical disclaimer is set if Groq fails to include it properly
+    if (!result.medical_disclaimer) {
+         result.medical_disclaimer = "AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms.";
+    }
+    return result;
+  } catch (err) {
+    console.warn('[LangChain] Groq recovery protocol failed, using fallback:', err.message);
+    return localFallbackRecovery();
   }
 };

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HeartPulse, FileText, Check, AlertTriangle, ArrowRight, Play, Loader } from 'lucide-react';
-import { pythonApi } from '../../services/api.js';
+import { clinicalApi } from '../../services/api.js';
 
 export default function ClinicalRecovery({ userProfile }) {
   const [loading, setLoading] = useState(false);
@@ -13,11 +13,9 @@ export default function ClinicalRecovery({ userProfile }) {
     setLoading(true);
     setError(null);
     try {
-      const result = await pythonApi.ragProtocol(
-        userProfile.profileId || 'anxiety',
-        userProfile.severity || 'moderate',
-        userProfile.baselineArousalScore || 5,
-        userProfile.userId || 'demo-user'
+      const result = await clinicalApi.generateRecoveryProtocol(
+        userProfile.userId || 'demo-user',
+        userProfile
       );
       if (result.success && result.protocol) {
         setProtocol(result.protocol);
@@ -111,46 +109,32 @@ export default function ClinicalRecovery({ userProfile }) {
                  <div dangerouslySetInnerHTML={{ __html: protocol.replace(/\n/g, '<br/>') }} />
               ) : (
                  <div>
-                    <h3 style={{ color: '#00e5ff', marginTop: 0, marginBottom: 12, fontSize: 18 }}>🥑 Dietary Recommendations</h3>
-                    {protocol.diet_recommendations?.map((diet, i) => (
-                        <div key={i} style={{ marginBottom: 16, padding: 16, background: 'rgba(0,0,0,0.2)', borderRadius: 12 }}>
-                            <strong style={{ color: '#fff', fontSize: 16 }}>{diet.category || 'General'}</strong> <span style={{ opacity: 0.6, fontSize: 13 }}>(Priority: {diet.priority})</span><br/>
-                            <em>Frequency:</em> {diet.frequency}<br/>
-                            <em>Items:</em> {diet.items?.join(', ')}<br/>
-                            <em>Rationale:</em> {diet.rationale}
-                        </div>
-                    ))}
+                     <div style={{ marginBottom: 24, padding: 16, background: 'rgba(0,229,255,0.05)', borderRadius: 12, borderLeft: '4px solid #00e5ff' }}>
+                        <strong style={{ color: '#e8f4fb', fontSize: 16 }}>Baseline Diagnosis:</strong><br/>
+                        <span style={{ color: '#8bafc2' }}>{protocol.diagnosis_baseline}</span>
+                     </div>
 
-                    <h3 style={{ color: '#ffb300', marginTop: 24, marginBottom: 12, fontSize: 18 }}>🏃‍♂️ Exercise Protocol</h3>
-                    {protocol.exercise_protocol?.map((ex, i) => (
-                        <div key={i} style={{ marginBottom: 16, padding: 16, background: 'rgba(0,0,0,0.2)', borderRadius: 12 }}>
-                            <strong style={{ color: '#fff', fontSize: 16 }}>{ex.type}</strong> <span style={{ opacity: 0.6, fontSize: 13 }}>({ex.intensity} intensity)</span><br/>
-                            <em>Duration:</em> {ex.duration}<br/>
-                            <em>Rationale:</em> {ex.rationale}
-                        </div>
-                    ))}
-
-                    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 24 }}>
-                      <div style={{ flex: '1 1 250px' }}>
-                        <h3 style={{ color: '#ff6b8a', marginBottom: 8, fontSize: 18 }}>🚫 Avoid</h3>
-                        <ul style={{ paddingLeft: 20 }}>
-                            {protocol.foods_to_avoid?.map((item, i) => <li key={i}>{item}</li>)}
+                    <h3 style={{ color: '#00e5ff', marginTop: 0, marginBottom: 12, fontSize: 18 }}>🥑 Neuro-Diet Plan</h3>
+                    <div style={{ marginBottom: 16, padding: 16, background: 'rgba(0,0,0,0.2)', borderRadius: 12 }}>
+                        <ul style={{ paddingLeft: 20, margin: 0 }}>
+                            {protocol.neuro_diet_plan?.map((diet, i) => (
+                                <li key={i} style={{ marginBottom: 8 }}>{diet}</li>
+                            ))}
                         </ul>
-                      </div>
-                      <div style={{ flex: '1 1 250px' }}>
-                        <h3 style={{ color: '#c4b5fd', marginBottom: 8, fontSize: 18 }}>💡 Lifestyle Tips</h3>
-                        <ul style={{ paddingLeft: 20 }}>
-                            {protocol.lifestyle_tips?.map((tip, i) => <li key={i}>{tip}</li>)}
-                        </ul>
-                      </div>
                     </div>
 
-                    <div style={{ marginTop: 24, padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, borderLeft: '4px solid #00e5ff' }}>
-                        <strong style={{ color: '#e8f4fb' }}>Clinical Rationale:</strong> {protocol.clinical_rationale}
+                    <h3 style={{ color: '#ffb300', marginTop: 24, marginBottom: 12, fontSize: 18 }}>🏃‍♂️ Somatic Exercise Plan</h3>
+                    <div style={{ marginBottom: 16, padding: 16, background: 'rgba(0,0,0,0.2)', borderRadius: 12 }}>
+                        {protocol.somatic_exercise_plan}
                     </div>
 
-                    <div style={{ marginTop: 16, fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>
-                        <em>Sources: {protocol.sources?.join(', ')}</em>
+                    <div style={{ marginTop: 24, padding: 16, background: 'rgba(255,107,138,0.05)', borderRadius: 12, borderLeft: '4px solid #ff6b8a' }}>
+                        <strong style={{ color: '#e8f4fb' }}>Confidence Anchor:</strong><br/>
+                        <span style={{ color: '#8bafc2' }}>{protocol.confidence_anchor}</span>
+                    </div>
+
+                    <div style={{ marginTop: 24, fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontStyle: 'italic' }}>
+                        {protocol.medical_disclaimer}
                     </div>
                  </div>
               )}

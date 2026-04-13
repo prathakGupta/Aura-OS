@@ -335,7 +335,7 @@ export default function LandingPage({ onLaunch }) {
       <span className="section-label"><span className="dot"></span> Ready?</span>
       <h2>Experience AuraOS</h2>
       <p>Open the app and feel the difference between tracking your mental health and being caught by it.</p>
-      <a href="http://localhost:5173" className="btn-primary" style={{fontSize:'17px', padding:'16px 40px'}} target="_blank">
+      <a onClick={(e) => { e.preventDefault(); onLaunch(); }} href="#" className="btn-primary" style={{fontSize:'17px', padding:'16px 40px'}}>
         Launch AuraOS →
       </a>
     </div>

@@ -37,9 +37,12 @@ except ImportError:
 try:
     from langchain.prompts import PromptTemplate
     from langchain_groq import ChatGroq
+    from pydantic import BaseModel, Field
 except ImportError:
     PromptTemplate = None
     ChatGroq = None
+    BaseModel = None
+    Field = None
 
 
 # ── Paths ───────────────────────────────────────────────────────────────
@@ -217,8 +220,18 @@ def _get_rag_llm():
         return None
 
 
-_RAG_PROMPT_TEMPLATE = """You are a clinical recovery protocol generator for AuraOS, a mental health app.
-You synthesize evidence-based recommendations from real medical research.
+class RecoveryProtocolModel(BaseModel):
+    diagnosis_baseline: str = Field(..., description="Baseline diagnosis summary (e.g. 'High Cortisol / Acute Anxiety')")
+    neuro_diet_plan: list[str] = Field(..., description="List of specific, strict neurochemical diet interventions")
+    somatic_exercise_plan: str = Field(..., description="Specific, somatic exercise plan to lower or raise appropriate biomarkers")
+    confidence_anchor: str = Field(..., description="A brief reminder to anchor the user's confidence based on any small wins")
+    disclaimer: str = Field(
+        default="AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms.",
+        description="Standard medical liability disclaimer"
+    )
+
+_RAG_PROMPT_TEMPLATE = """You are a clinical recovery protocol generator for AuraOS.
+Synthesize evidence-based recommendations from real medical research provided below.
 
 USER PROFILE:
 - Condition: {condition}
@@ -228,73 +241,25 @@ USER PROFILE:
 RETRIEVED CLINICAL EVIDENCE:
 {rag_context}
 
-Based on the clinical evidence above, generate a personalized recovery protocol.
-You MUST only recommend interventions that are supported by the retrieved evidence.
-Do NOT hallucinate or invent recommendations not in the evidence.
+RULES YOU MUST FOLLOW STRICTLY:
+1. If Condition implies ADHD/Executive Freeze: Prescribe Dopamine-boosting protocols (High protein breakfast, Tyrosine-heavy snacks, HIIT/complex motor exercises).
+2. If Condition implies High Arousal/Severe Anxiety: Prescribe GABA-boosting and Cortisol-lowering protocols (Magnesium-rich foods, Omega-3s, strict zero-caffeine, Zone 2 steady-state cardio or Yoga).
+3. If Condition implies Depression/Low Confidence: Prescribe Serotonin-boosting protocols (Tryptophan-rich foods, gut-health probiotics, outdoor sunlight exposure).
 
-Respond in this exact JSON format (no markdown, no code fences):
-{{
-  "condition": "{condition}",
-  "severity": "{severity}",
-  "diet_recommendations": [
-    {{
-      "priority": 1,
-      "category": "category name",
-      "items": ["specific food 1", "specific food 2"],
-      "rationale": "why this helps, citing the neurochemical mechanism",
-      "frequency": "how often"
-    }}
-  ],
-  "exercise_protocol": [
-    {{
-      "priority": 1,
-      "type": "exercise type",
-      "duration": "time and frequency",
-      "intensity": "low/moderate/high",
-      "rationale": "neurochemical mechanism from the evidence"
-    }}
-  ],
-  "foods_to_avoid": ["food 1", "food 2"],
-  "lifestyle_tips": ["tip 1", "tip 2"],
-  "clinical_rationale": "2-3 sentence summary of the scientific basis",
-  "sources": ["Harvard Nutritional Psychiatry", "Dr. Ratey - Spark"]
-}}"""
-
+Generate a personalized recovery protocol applying the clinical evidence subject strictly to the aforementioned neuro-chemical rules."""
 
 def _fallback_protocol(condition: str, severity: str) -> dict:
     """Returns a minimal protocol when RAG or LLM is unavailable."""
     return {
-        "condition": condition,
-        "severity": severity,
-        "diet_recommendations": [
-            {
-                "priority": 1,
-                "category": "Anti-inflammatory basics",
-                "items": ["leafy greens", "fatty fish", "berries", "nuts"],
-                "rationale": "Anti-inflammatory foods support brain health and mood regulation.",
-                "frequency": "Daily",
-            }
+        "diagnosis_baseline": f"{severity.capitalize()} {condition.capitalize()}",
+        "neuro_diet_plan": [
+            "Magnesium heavy dinner (spinach/seeds)",
+            "Zero caffeine after 12 PM",
+            "High protein breakfast"
         ],
-        "exercise_protocol": [
-            {
-                "priority": 1,
-                "type": "Walking",
-                "duration": "30 minutes, 5x/week",
-                "intensity": "moderate",
-                "rationale": "Moderate aerobic exercise increases BDNF and serotonin production.",
-            }
-        ],
-        "foods_to_avoid": ["refined sugar", "processed foods", "excessive caffeine"],
-        "lifestyle_tips": [
-            "Start with a 5-minute walk — momentum builds from tiny wins.",
-            "Eat a source of protein at every meal for sustained energy.",
-        ],
-        "clinical_rationale": (
-            "Based on nutritional psychiatry consensus and exercise neurochemistry research, "
-            "anti-inflammatory nutrition combined with regular moderate exercise provides "
-            "the strongest evidence-based foundation for mental health support."
-        ),
-        "sources": ["Harvard Nutritional Psychiatry", "Dr. John Ratey - Spark"],
+        "somatic_exercise_plan": "20-minute Zone 2 cardio (brisk walk) to lower resting heart rate.",
+        "confidence_anchor": "Remind yourself you successfully initiated steps toward mental clarity today.",
+        "disclaimer": "AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms.",
         "_fallback": True,
     }
 
@@ -342,25 +307,21 @@ def generate_recovery_protocol(
     )
 
     try:
-        chain = prompt | llm
-        raw = chain.invoke({
-            "condition": condition,
-            "severity": severity,
-            "arousal_score": str(arousal_score),
-            "rag_context": rag_context,
-        })
-        content = str(raw.content).strip()
-
-        # Parse JSON from LLM response
-        import json
-        # Strip markdown fences if present
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1]
-        if content.endswith("```"):
-            content = content.rsplit("```", 1)[0]
-        content = content.strip()
-
-        protocol = json.loads(content)
+        if hasattr(llm, 'with_structured_output') and BaseModel is not None:
+            llm_with_structure = llm.with_structured_output(RecoveryProtocolModel)
+            chain = prompt | llm_with_structure
+            structured_response = chain.invoke({
+                "condition": condition,
+                "severity": severity,
+                "arousal_score": str(arousal_score),
+                "rag_context": rag_context,
+            })
+            # Convert BaseModel to dict
+            protocol = structured_response.model_dump()
+        else:
+            print("[RAG] with_structured_output unavailable. Using fallback.")
+            protocol = _fallback_protocol(condition, severity)
+        
         protocol["rag_passages"] = passages
         protocol["_source"] = "rag_llm"
         return protocol

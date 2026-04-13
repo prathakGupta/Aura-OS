@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════════════════════════
+# AuraOS — Full Stack Docker Compose
+#
+# Usage:
+#   docker-compose up --build        (first run / after code changes)
+#   docker-compose up -d             (detached mode)
+#   docker-compose down              (stop all)
+#   docker-compose logs -f           (tail all logs)
+#
+# Services:
+#   aura-frontend  → http://localhost:3000  (NGINX + React SPA)
+#   aura-node      → http://localhost:5001  (Express + LangChain)
+#   aura-python    → http://localhost:8000  (FastAPI + Whisper)
+# ═══════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  # ── Node.js Backend ────────────────────────────────────────
+  aura-node:
+    build:
+      context: .
+      dockerfile: backend-node/Dockerfile
+    container_name: aura-node
+    ports:
+      - "5001:5001"
+    env_file:
+      - backend-node/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - FRONTEND_URL=http://localhost:3000
+    networks:
+      - aura-net
+    restart: unless-stopped
+
+  # ── Python Backend ─────────────────────────────────────────
+  aura-python:
+    build:
+      context: .
+      dockerfile: backend-python/Dockerfile
+    container_name: aura-python
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend-python/.env
+    environment:
+      - FRONTEND_URL=http://localhost:3000
+      - FRONTEND_ORIGINS=http://localhost:3000,http://localhost:5173
+      - NODE_BACKEND_URL=http://aura-node:5001
+    volumes:
+      - chroma-data:/app/.chroma_db
+    networks:
+      - aura-net
+    restart: unless-stopped
+
+  # ── Frontend (NGINX + React SPA) ───────────────────────────
+  aura-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: aura-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - aura-node
+      - aura-python
+    networks:
+      - aura-net
+    restart: unless-stopped
+
+networks:
+  aura-net:
+    driver: bridge
+
+volumes:
+  chroma-data:

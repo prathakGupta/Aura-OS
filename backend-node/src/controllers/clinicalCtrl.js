@@ -11,7 +11,7 @@
 import UserState   from '../models/UserState.js';
 import AlertLog    from '../models/AlertLog.js';
 import ClinicalReport from '../models/ClinicalReport.js';
-import { generateGuardianBrief } from '../services/langchain.js';
+import { generateGuardianBrief, generateRecoveryProtocol } from '../services/langchain.js';
 import { sendGuardianAlert }     from '../services/twilio.js';
 import { sendGuardianReportEmail } from '../services/email.js';
 import { buildClinicalReportPdfBuffer } from '../services/reportPdf.js';
@@ -646,3 +646,48 @@ function _groupByDayRatio(events, key) {
     }))
     .sort((a, b) => a.day.localeCompare(b.day));
 }
+
+// ── POST /api/clinical/recovery-protocol ─────────────────────────────────────────
+// Generates a recovery protocol (diet & exercise) based on clinical telemetry.
+export const generateRecoveryProtocolHandler = async (req, res, next) => {
+  try {
+    const { userId, reportData } = req.body;
+    if (!userId) throw new AppError('userId is required.', 400);
+
+    let telemetryDataToUse = reportData;
+    
+    if (!telemetryDataToUse) {
+      try {
+        const user = await UserState.findOne({ userId }).lean();
+        if (user) {
+          const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const telemetry = user.clinicalTelemetry || {};
+          const recentExec = (telemetry.executiveFunction || []).filter(e => new Date(e.timestamp) > since);
+          telemetryDataToUse = { 
+             recentExecutiveFunction: recentExec,
+             vocalStressEvents: telemetry.vocalStressEvents || [],
+          };
+        }
+      } catch (dbErr) {
+        console.warn('[Clinical] DB fetch failed. Mongoose might be offline. Proceeding with fallback.', dbErr.message);
+      }
+      
+      if (!telemetryDataToUse) {
+         telemetryDataToUse = { 
+            status: "DB unavailable, utilizing default baseline for generation.", 
+            userId 
+         };
+      }
+    }
+
+    const protocol = await generateRecoveryProtocol(telemetryDataToUse);
+
+    res.json({
+      success: true,
+      generatedAt: new Date().toISOString(),
+      protocol,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

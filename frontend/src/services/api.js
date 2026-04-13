@@ -87,3 +87,8 @@ export const pythonApi = {
   ragProtocol: (condition, severity, arousal_score, userId) =>
     postAI('/v1/rag/recovery-protocol', { condition, severity, arousal_score, user_id: userId }),
 };
+
+// ── Clinical API ──────────────────────────────────────────────────────────────
+export const clinicalApi = {
+  generateRecoveryProtocol: (userId, reportData) => postAI('/clinical/recovery-protocol', { userId, reportData }),
+};

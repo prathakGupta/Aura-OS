@@ -33,3 +33,5 @@ chromadb==0.4.24                # Local vector store — no API key needed
 sentence-transformers==2.5.1    # all-MiniLM-L6-v2 embeddings (runs locally)
 langchain-community==0.0.29     # Community vector store integrations
 langchain-text-splitters==0.0.1 # RecursiveCharacterTextSplitter
+
+

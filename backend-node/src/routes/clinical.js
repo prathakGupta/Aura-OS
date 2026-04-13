@@ -9,6 +9,7 @@ import {
   generateTherapyBriefHandler,
   generateSessionReportHandler,
   downloadSessionReportPdfHandler,
+  generateRecoveryProtocolHandler,
 } from '../controllers/clinicalCtrl.js';
 
 const router = express.Router();
@@ -32,5 +33,8 @@ router.post('/therapy-brief',   asyncHandler(generateTherapyBriefHandler));
 // Session report generation + manual PDF download
 router.post('/session-report', asyncHandler(generateSessionReportHandler));
 router.get('/session-report/:reportId/pdf', asyncHandler(downloadSessionReportPdfHandler));
+
+// Recovery Protocol generation
+router.post('/recovery-protocol', asyncHandler(generateRecoveryProtocolHandler));
 
 export default router;
