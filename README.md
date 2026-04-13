@@ -10,13 +10,14 @@ Current mental health apps are overwhelmingly passive. They ask you to fill out 
 
 ## Our solution
 
-Three intervention modes, each targeting a different failure state:
+Four intervention modes, each targeting a different failure state:
 
 | Mode | Trigger | Mechanism |
 |---|---|---|
 | **Aura Voice** | Racing thoughts, can't articulate | Voice AI that reads acoustic emotion, not just words |
 | **Cognitive Forge** | Panic, overwhelmed by worries | Physics-based worry destruction — literally drag fears into fire |
 | **Task Shatterer** | ADHD task paralysis, frozen | AI breaks goals into 2-minute micro-quests, shown one at a time |
+| **Clinical RAG Protocol** | Seeking grounded recovery steps | AI retrieves evidence-based nutrition and exercise recommendations using ChromaDB |
 
 ---
 
@@ -24,9 +25,9 @@ Three intervention modes, each targeting a different failure state:
 
 ```
 aura-os/
-├── frontend/         React + Vite · Matter.js · Zustand
+├── frontend/         React + Vite · Matter.js · Zustand · Framer Motion
 ├── backend-node/     Express · LangChain · Gemini API · MongoDB
-├── backend-python/   FastAPI · Whisper · Groq · ElevenLabs  (Deepanshu)
+├── backend-python/   FastAPI · Whisper · Groq · ElevenLabs · ChromaDB (Deepanshu)
 └── docs/             API_CONTRACTS.md · architecture diagram
 ```
 
@@ -62,6 +63,14 @@ Solves ADHD task paralysis by destroying monolithic goals.
 - **Frontend:** Flashcard UI — only the **first step** is shown. Clicking "Done ✓" fires `canvas-confetti` and advances to the next step. All quests done → full confetti celebration
 - **Focus Anchor:** Brown noise loops via HTML5 Audio while a task is active (scientifically backed ADHD focus aid)
 - **Body Double:** `document.visibilityState` polling — if user switches tabs for > 8 seconds, a fullscreen SVG avatar appears: *"Hey — we were in a focus block."*
+
+### 4. Clinical RAG Protocol — Evidence-Based Recovery
+
+A personalized, scientifically-backed recovery system engineered for users needing grounded, clinical advice.
+
+- **Knowledge Base:** ChromaDB vector store ingests scientific papers on Nutritional Psychiatry and Exercise Physiology.
+- **RAG Engine:** Groq LLM queries the vector store, augmenting the prompt with condition (ADHD/Anxiety), severity, and baseline arousal scores.
+- **Frontend Integration:** Fast rendering and tailored protocol creation with polished framer-motion transitions for readability.
 
 ---
 

@@ -81,3 +81,9 @@ export const shatterApi = {
   getActive:      (userId)                         => get(`/shatter/active/${userId}`),
   getHistory:     (userId)                         => get(`/shatter/history/${userId}`),
 };
+
+// ── Python RAG Backend ────────────────────────────────────────────────────────
+export const pythonApi = {
+  ragProtocol: (condition, severity, arousal_score, userId) =>
+    postAI('/v1/rag/recovery-protocol', { condition, severity, arousal_score, user_id: userId }),
+};

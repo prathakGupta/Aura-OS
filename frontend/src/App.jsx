@@ -10,13 +10,14 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Wind, Zap, Sun, Moon } from 'lucide-react';
+import { Mic, Wind, Zap, Sun, Moon, HeartPulse } from 'lucide-react';
 import useStore from './store/useStore.js';
 import { shatterApi, stateApi } from './services/api.js';
 import ErrorBoundary        from './components/ErrorBoundary.jsx';
 import AuraVoice            from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge       from './components/cognitive-forge/CognitiveForge.jsx';
 import TaskShatter          from './components/task-shatter/TaskShatter.jsx';
+import ClinicalRecovery     from './components/clinical-rag/ClinicalRecovery.jsx';
 import Dashboard            from './components/observer-portal/Dashboard.jsx';
 import LandingPage          from './components/landing/LandingPage.jsx';
 import MentalHealthIntake,
@@ -27,6 +28,7 @@ const TABS = [
   { id: 'voice',   label: 'Aura',    Icon: Mic,  color: '#00e5ff' },
   { id: 'forge',   label: 'Forge',   Icon: Wind, color: '#ffb300' },
   { id: 'shatter', label: 'Shatter', Icon: Zap,  color: '#c4b5fd' },
+  { id: 'protocol',label: 'Protocol',Icon: HeartPulse, color: '#ff6b8a' },
 ];
 
 /* ── Profile badge shown in the nav ─────────────────────────── */
@@ -350,6 +352,11 @@ export default function App() {
                 {activeTab === 'shatter' && (
                   <ErrorBoundary label="Task Shatterer">
                     <TaskShatter userProfile={userProfile} />
+                  </ErrorBoundary>
+                )}
+                {activeTab === 'protocol' && (
+                  <ErrorBoundary label="Clinical Protocol">
+                    <ClinicalRecovery userProfile={userProfile} />
                   </ErrorBoundary>
                 )}
 

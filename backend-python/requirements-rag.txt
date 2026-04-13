@@ -1,0 +1,5 @@
+# RAG Pipeline (Clinical Knowledge Base)
+chromadb==0.4.24
+sentence-transformers==2.5.1
+langchain-community==0.0.29
+langchain-text-splitters==0.0.1
