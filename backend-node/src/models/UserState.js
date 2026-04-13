@@ -89,6 +89,14 @@ const ClinicalTelemetrySchema = new mongoose.Schema({
   forgeSessions:          { type: [ForgeSessionSchema],           default: [] },
   executiveFunction:      { type: [ExecutiveFunctionEventSchema], default: [] },
   stressSpikes:           { type: [StressSpikeSchema],            default: [] },
+  // 🌟 NEW: Set once from MentalHealthIntake; consumed by LangChain Guardian Clinical Report.
+  // Scale: 1 = calm baseline, 10 = acute distress.
+  baselineArousalScore:   { type: Number, min: 1, max: 10, default: null },
+  baselineArousalSetAt:   { type: Date,   default: null },
+  baselineProfile:        { type: mongoose.Schema.Types.Mixed, default: {} },
+  // PerceptionProbe bistable illusion sessions — measures cognitive flexibility
+  // Each entry: { imageId, firstSeen, latencyMs, canSwitchPerspective, recordedAt }
+  probeData:              [{ type: mongoose.Schema.Types.Mixed, default: {} }],
 }, { _id: false });
 
 /* ── Root schema ───────────────────────────────────────────── */

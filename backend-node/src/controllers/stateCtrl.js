@@ -109,3 +109,34 @@ export const wipeStateHandler = async (req, res) => {
     message: 'User state wiped. Fresh start.',
   });
 };
+
+// ── PATCH /api/state/:userId/intake ─────────────────────────────────────────
+//
+// Called by the frontend immediately after the MentalHealthIntake completes.
+// Persists `baselineArousalScore` (1-10) to clinicalTelemetry so the
+// LangChain Guardian Clinical Report service can read it at report generation time.
+
+export const patchIntakeHandler = async (req, res) => {
+  const { userId } = req.params;
+  const { baselineArousalScore } = req.body;
+
+  if (!userId) throw new AppError('userId is required.', 400);
+
+  const score = Number(baselineArousalScore);
+  if (!Number.isFinite(score) || score < 1 || score > 10) {
+    throw new AppError('baselineArousalScore must be a number between 1 and 10.', 400);
+  }
+
+  await UserState.findOneAndUpdate(
+    { userId },
+    {
+      $set: {
+        'clinicalTelemetry.baselineArousalScore': score,
+        'clinicalTelemetry.baselineArousalSetAt': new Date(),
+      },
+    },
+    { upsert: true, new: true }
+  );
+
+  res.json({ success: true, baselineArousalScore: score });
+};

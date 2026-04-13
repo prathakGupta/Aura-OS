@@ -23,6 +23,7 @@ import BodyDouble from './BodyDouble.jsx';
 import SymptomInterruption from './SymptomInterruption.jsx';
 import useFocusTimer from '../../hooks/useFocusTimer.js';
 import useTelemetry from '../../hooks/useTelemetry.js';
+import useIdleDetection from '../../hooks/useIdleDetection.js';
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 const COLORS = [
@@ -52,15 +53,6 @@ const BLOCKERS = [
     desc: 'My mind feels slow and heavy today',
     envHint: 'deep_focus_dark',
     tip: 'Screen dims for focus',
-  },
-  {
-    id: 'too_overwhelming',
-    label: 'Too big / Frozen',
-    icon: Mountain,
-    color: '#ff6b8a',
-    desc: "Task feels massive and I don't know where to start",
-    envHint: 'meditation_first',
-    tip: 'Breathing reset + guardian alert',
   },
 ];
 
@@ -238,6 +230,43 @@ function FragmentCard({ frag, onPositionChange, onDelete, onTextChange, onColorC
   );
 }
 
+/* ── Hold To Complete Button for Tunnel Vision ──────────────────────── */
+function HoldToCompleteButton({ onComplete, disabled, renderTime }) {
+  const [holding, setHolding] = useState(false);
+  
+  return (
+    <motion.button
+      onPointerDown={() => !disabled && setHolding(true)}
+      onPointerUp={() => setHolding(false)}
+      onPointerLeave={() => setHolding(false)}
+      style={{
+        position: 'relative', width: '100%', height: 60, borderRadius: 16, border: 'none',
+        background: 'rgba(255,255,255,0.05)', color: 'white', fontFamily: 'inherit', fontSize: 16, fontWeight: 800,
+        overflow: 'hidden', cursor: disabled ? 'not-allowed' : 'pointer',
+        boxShadow: disabled ? 'none' : '0 10px 44px rgba(124,58,237,0.15)',
+        marginBottom: 12
+      }}
+    >
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+        {disabled ? <div className="spinner" /> : <Sparkles size={20} />}
+        {disabled ? 'Saving…' : 'Press & Hold to Complete'}
+      </div>
+      <motion.div 
+        initial={{ width: '0%' }}
+        animate={{ width: holding ? '100%' : '0%' }}
+        transition={{ duration: holding ? 1.5 : 0.3, ease: 'linear' }}
+        onAnimationComplete={(definition) => {
+          if (definition.width === '100%' && holding) {
+            setHolding(false);
+            onComplete(Date.now() - renderTime);
+          }
+        }}
+        style={{ position: 'absolute', top: 0, left: 0, bottom: 0, background: 'linear-gradient(135deg,#5b21b6,#00b4d8)' }}
+      />
+    </motion.button>
+  );
+}
+
 /* ── Report generation overlay ──────────────────────────────────────── */
 function ReportOverlay({ onClose, reportInfo, error }) {
   const steps = ['Compiling session data', 'Generating AI summary', 'Building PDF', 'Dispatching to guardian'];
@@ -322,6 +351,7 @@ export default function TaskShatter() {
   const {
     userId, activeTask, setActiveTask, completeQuestLocally,
     clearTask, taskComplete, currentQuestIndex, worries,
+    lastKnownActivity, setLastKnownActivity, questTelemetry, addQuestTelemetry,
   } = useStore();
 
   // Phase: 'input' | 'coaching' | 'intervention' | 'loading' | 'canvas' | 'focus' | 'done'
@@ -370,6 +400,38 @@ export default function TaskShatter() {
     if (phase === 'focus') setFocusTimerActive(true);
     else setFocusTimerActive(false);
   }, [phase, currentQuestIndex]);
+
+  // Track recent activity for the crisis fallback
+  useEffect(() => {
+    if (phase === 'input') setLastKnownActivity('Input Task: ' + taskText);
+    else if (phase === 'coaching') setLastKnownActivity('Selecting Blocker for: ' + originalTask);
+    else if (phase === 'canvas') setLastKnownActivity('Canvas Mode: ' + originalTask);
+    else if (phase === 'focus' && focusQuest) setLastKnownActivity(`Focusing on step ${currentQuestIndex + 1}: ${focusQuest.action}`);
+  }, [phase, taskText, originalTask, focusQuest, currentQuestIndex, setLastKnownActivity]);
+
+  // Automated Freeze Detection (30 secs idle)
+  const triggerCrisisFlow = useCallback(() => {
+    setBlocker({ id: 'automated_freeze', label: 'Automated Freeze Detection' });
+    setPhase('intervention');
+    const activityStr = 'Automated Freeze Detection: ' + (lastKnownActivity || originalTask || taskText || 'Unknown');
+    apiCallRef.current = Promise.all([
+      shatterApi.coachBreakdown(taskText.trim() || 'Overwhelmed', 'too_overwhelming', userId).catch(() => null),
+      clinicalApi.sessionReport({
+        userId, source: 'panic',
+        currentTask: taskText.trim() || 'Unknown',
+        selectedBlocker: activityStr,
+        vocalArousalScore: 8,
+        sendToGuardian: true,
+        channels: { whatsapp: true, email: true },
+        sessionSnapshot: {
+          initialAnxietyQuery: taskText.trim(),
+          shatteredWorryBlocks: worries.map((w) => ({ id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active' })),
+        },
+      }).catch(() => null),
+    ]);
+  }, [lastKnownActivity, taskText, originalTask, userId, worries]);
+
+  useIdleDetection(30000, triggerCrisisFlow);
 
   // ── Phase transitions ────────────────────────────────────────────────────
   const handleShowCoach = () => {
@@ -504,7 +566,7 @@ export default function TaskShatter() {
     bigConfetti();
   };
 
-  const handleDone = useCallback(async () => {
+  const handleDone = useCallback(async (durationMs = 0) => {
     if (!focusQuest || completing) return;
     setCompleting(true);
     try {
@@ -512,13 +574,31 @@ export default function TaskShatter() {
       setQuestStreak(newStreak);
       setFocusTimerActive(false);
 
+      const newTelemetry = { stepId: focusQuest.id, action: focusQuest.action, durationMs, completedAt: new Date().toISOString() };
+      addQuestTelemetry(newTelemetry);
+      const updatedTelemetry = [...questTelemetry, newTelemetry];
+
       if (apiTaskId) {
         const data = await shatterApi.complete(userId, activeTask.id, focusQuest.id);
-        if (data.taskComplete) { bigConfetti(); completeQuestLocally(focusQuest.id, null); }
+        if (data.taskComplete) { 
+          bigConfetti(); 
+          completeQuestLocally(focusQuest.id, null); 
+          clinicalApi.sessionReport({
+            userId, source: 'manual', taskId: activeTask.id, currentTask: originalTask,
+            sessionSnapshot: { timelineMicroquests: updatedTelemetry }
+          }).catch(() => null);
+        }
         else { slotConfetti(window.innerWidth / 2, window.innerHeight * 0.65); completeQuestLocally(focusQuest.id, data.nextQuest); }
       } else {
         const rem = focusQuests.filter((q) => !q.completed && q.id !== focusQuest.id);
-        if (!rem.length) { bigConfetti(); completeQuestLocally(focusQuest.id, null); }
+        if (!rem.length) { 
+          bigConfetti(); 
+          completeQuestLocally(focusQuest.id, null); 
+          clinicalApi.sessionReport({
+            userId, source: 'manual', taskId: `local-${Date.now()}`, currentTask: originalTask,
+            sessionSnapshot: { timelineMicroquests: updatedTelemetry }
+          }).catch(() => null);
+        }
         else { slotConfetti(window.innerWidth / 2, window.innerHeight * 0.65); completeQuestLocally(focusQuest.id, rem[0]); }
       }
       // Streak milestone feedback
@@ -527,7 +607,7 @@ export default function TaskShatter() {
       }
     } catch (e) { setError(e.message); }
     finally { setCompleting(false); }
-  }, [focusQuest, completing, userId, activeTask, focusQuests, apiTaskId, completeQuestLocally, questStreak]);
+  }, [focusQuest, completing, userId, activeTask, focusQuests, apiTaskId, completeQuestLocally, questStreak, originalTask, questTelemetry, addQuestTelemetry]);
 
   const handleGenerateReport = useCallback(async (sendToGuardian = false) => {
     if (!userId) return;
@@ -837,14 +917,6 @@ export default function TaskShatter() {
               </div>
             </div>
 
-            {/* Progress bar with step count */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
-              <div className="progress-track" style={{ flex: 1 }}>
-                <div className="progress-fill" style={{ width: `${progress}%` }} />
-              </div>
-              <span style={{ fontSize: 11.5, color: '#4a6275', fontWeight: 700, whiteSpace: 'nowrap' }}>{completedN}/{focusQuests.length}</span>
-            </div>
-
             {/* Quest card with animated border */}
             <div style={{ position: 'relative', marginBottom: 18 }}>
               <div style={{
@@ -874,21 +946,12 @@ export default function TaskShatter() {
               </div>
             </div>
 
-            {/* Done button */}
-            <motion.button onClick={handleDone} disabled={completing}
-              whileHover={{ scale: 1.015, boxShadow: '0 10px 44px rgba(124,58,237,0.45)' }} whileTap={{ scale: 0.955 }}
-              style={{
-                width: '100%', padding: '20px', borderRadius: 16, border: 'none',
-                background: 'linear-gradient(135deg,#5b21b6,#7c3aed,#00b4d8)',
-                backgroundSize: '200% 200%', animation: 'gradSpin 6s ease infinite',
-                color: 'white', fontFamily: 'inherit', fontSize: 16, fontWeight: 800,
-                letterSpacing: '-0.025em', marginBottom: 12, cursor: completing ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              }}>
-              {completing ? <div className="spinner" /> : <Check size={20} />}
-              {completing ? 'Saving…' : 'Done — next step'}
-              {!completing && <ArrowRight size={18} />}
-            </motion.button>
+            {/* Tunnel Vision somatic finish button */}
+            <HoldToCompleteButton 
+              onComplete={handleDone} 
+              disabled={completing} 
+              renderTime={Date.now()} 
+            />
 
             {/* Secondary actions */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>

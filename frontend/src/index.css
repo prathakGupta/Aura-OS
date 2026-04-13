@@ -218,6 +218,38 @@ a { color: inherit; text-decoration: none; }
   margin: 0 auto;            /* horizontal centering within content-scroll */
 }
 
+/* ── Global modal overlay ──────────────────────────────────── */
+/* Use this wrapper for ALL floating panels / game modals      */
+.aura-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2,9,21,0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Responsive canvas / game wrapper ─────────────────────── */
+/* Prevents physics canvases from overflowing parent.         */
+.aura-canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 75vh;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+}
+.aura-canvas-wrap canvas,
+.aura-canvas-wrap > * {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+
 /* ── Typography ────────────────────────────────────────────── */
 .section-title {
   font-size: 28px;

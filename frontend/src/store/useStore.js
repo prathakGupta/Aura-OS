@@ -64,6 +64,25 @@ const useStore = create((set, get) => ({
     set({ userProfile: null });
   },
 
+  // ── Clinical intake state ───────────────────────────────────
+  // baselineArousalScore: 1–10 derived from intake answers.
+  // isHighAnxietyMode:    true when score > 7 → dims UI, surfaces somatic tools.
+  baselineArousalScore: null,
+  isHighAnxietyMode:    false,
+
+  // Maps the intake avgScore (1–4 frequency scale) to a 1–10 arousal score,
+  // then atomically updates both fields. Triggers high-anxiety mode if > 7.
+  setBaselineArousalScore: (intakeAvgScore) => {
+    // intakeAvgScore is 1–4; scale to 1–10 linearly: score = (avg - 1) / 3 * 9 + 1
+    const arousalScore = Math.round(((intakeAvgScore - 1) / 3) * 9 + 1);
+    const clamped = Math.max(1, Math.min(10, arousalScore));
+    set({
+      baselineArousalScore: clamped,
+      isHighAnxietyMode:    clamped > 7,
+    });
+    return clamped;
+  },
+
   // ── Navigation ─────────────────────────────────────────────
   activeTab: 'forge',   // 'voice' | 'forge' | 'shatter'
   setTab: (tab) => set({ activeTab: tab }),
@@ -89,6 +108,18 @@ const useStore = create((set, get) => ({
   currentQuestIndex: 0,
   isBreakingDown:    false,
   taskComplete:      false,
+
+  // Clinical tracking
+  lastKnownActivity: null,
+  questTelemetry:    [],
+  baselineProfile:   {},
+  probeSessions:     [],
+  
+  setLastKnownActivity: (activity) => set({ lastKnownActivity: activity }),
+  addQuestTelemetry: (telemetry) => set((s) => ({ questTelemetry: [...s.questTelemetry, telemetry] })),
+  clearQuestTelemetry: () => set({ questTelemetry: [] }),
+  setBaselineAnswer: (key, value) => set((s) => ({ baselineProfile: { ...s.baselineProfile, [key]: value } })),
+  addProbeSession: (session) => set((s) => ({ probeSessions: [...s.probeSessions, session] })),
 
   setActiveTask: (task) =>
     set({
@@ -136,7 +167,7 @@ const useStore = create((set, get) => ({
   },
 
   setBreakingDown: (v) => set({ isBreakingDown: v }),
-  clearTask:       ()  => set({ activeTask: null, currentQuestIndex: 0, taskComplete: false }),
+  clearTask:       ()  => set({ activeTask: null, currentQuestIndex: 0, taskComplete: false, questTelemetry: [], lastKnownActivity: null }),
 
   // ── Aura Voice state ────────────────────────────────────────
   isListening:    false,

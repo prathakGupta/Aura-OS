@@ -42,28 +42,32 @@ const del    = (path)       => req('DELETE', path);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 export const stateApi = {
-  init: (userId) => post('/state/init', { userId }),
-  get:  (userId) => get(`/state/${userId}`),
-  wipe: (userId) => del(`/state/${userId}`),
+  init:        (userId)                       => post('/state/init', { userId }),
+  get:         (userId)                       => get(`/state/${userId}`),
+  wipe:        (userId)                       => del(`/state/${userId}`),
+  // Persists baselineArousalScore (1-10) to clinicalTelemetry in MongoDB.
+  // Called fire-and-forget from App.jsx after intake completes.
+  patchIntake: (userId, baselineArousalScore) =>
+    req('PATCH', `/state/${userId}/intake`, { baselineArousalScore }),
 };
 
 // ── Cognitive Forge ───────────────────────────────────────────────────────────
 export const forgeApi = {
-  extract:       (text, userId)              => postAI('/forge/extract', { text, userId }),
-  destroy:       (userId, worryId)           => post('/forge/destroy', { userId, worryId }),
+  extract:       (text, userId)                   => postAI('/forge/extract', { text, userId }),
+  destroy:       (userId, worryId)                => post('/forge/destroy', { userId, worryId }),
   vault:         (userId, worryId, worry, weight) =>
                    post('/forge/vault', { userId, worryId, worry, weight }),
-  getVault:      (userId)                    => get(`/forge/vault/${userId}`),
-  deleteVaulted: (userId, worryId)           => del(`/forge/vault/${userId}/${worryId}`),
+  getVault:      (userId)                         => get(`/forge/vault/${userId}`),
+  deleteVaulted: (userId, worryId)                => del(`/forge/vault/${userId}/${worryId}`),
 };
 
 // ── Task Shatterer ────────────────────────────────────────────────────────────
 export const shatterApi = {
-  coachBreakdown: (task, blocker, userId)   => postAI('/shatter/breakdown', { task, userId, blocker }),
-  breakdown: (task, userId)            => postAI('/shatter/breakdown', { task, userId }),
-  syncTimeline: (userId, taskId, timeline)  => post('/shatter/sync-timeline', { userId, taskId, timeline }),
-  complete:  (userId, taskId, questId) => post('/shatter/complete', { userId, taskId, questId }),
-  abandon:   (userId, taskId)          => post('/shatter/abandon', { userId, taskId }),
-  getActive: (userId)                  => get(`/shatter/active/${userId}`),
-  getHistory:(userId)                  => get(`/shatter/history/${userId}`),
+  coachBreakdown: (task, blocker, userId)          => postAI('/shatter/breakdown', { task, userId, blocker }),
+  breakdown:      (task, userId)                   => postAI('/shatter/breakdown', { task, userId }),
+  syncTimeline:   (userId, taskId, timeline)       => post('/shatter/sync-timeline', { userId, taskId, timeline }),
+  complete:       (userId, taskId, questId)        => post('/shatter/complete', { userId, taskId, questId }),
+  abandon:        (userId, taskId)                 => post('/shatter/abandon', { userId, taskId }),
+  getActive:      (userId)                         => get(`/shatter/active/${userId}`),
+  getHistory:     (userId)                         => get(`/shatter/history/${userId}`),
 };

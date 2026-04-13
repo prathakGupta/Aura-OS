@@ -14,6 +14,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Check, ChevronRight, SkipForward } from 'lucide-react';
+import useStore from '../store/useStore.js';
 
 /* ── Profile definitions ─────────────────────────────────────────────── */
 export const PROFILES = {
@@ -150,6 +151,8 @@ export default function MentalHealthIntake({ onComplete }) {
   const [qIndex,    setQIndex]    = useState(0);
   const [direction, setDirection] = useState(1);  // 1=forward, -1=backward
 
+  const setBaselineArousalScore = useStore((s) => s.setBaselineArousalScore);
+
   const profile  = profileId ? PROFILES[profileId] : null;
   const avgScore = answers.length ? answers.reduce((a, b) => a + b, 0) / answers.length : 0;
   const severity = getSeverity(avgScore);
@@ -194,13 +197,18 @@ export default function MentalHealthIntake({ onComplete }) {
   }, []);
 
   const finish = useCallback(() => {
+    // Compute baseline arousal score (1–10) from intake answers and push to store.
+    // setBaselineArousalScore also auto-sets isHighAnxietyMode: true when score > 7.
+    const baselineArousalScore = setBaselineArousalScore(avgScore);
+
     onComplete({
-      profileId:   profile.id,
-      severity:    severity.label.toLowerCase(),
+      profileId:            profile.id,
+      severity:             severity.label.toLowerCase(),
       avgScore,
-      primaryTab:  profile.primaryTab,
+      primaryTab:           profile.primaryTab,
+      baselineArousalScore, // consumed by LangChain clinical report service
     });
-  }, [profile, severity, avgScore, onComplete]);
+  }, [profile, severity, avgScore, onComplete, setBaselineArousalScore]);
 
   const skip = useCallback(() => {
     // Default to burnout/forge so the app is immediately usable

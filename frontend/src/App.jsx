@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Wind, Zap, Sun, Moon } from 'lucide-react';
 import useStore from './store/useStore.js';
-import { shatterApi } from './services/api.js';
+import { shatterApi, stateApi } from './services/api.js';
 import ErrorBoundary        from './components/ErrorBoundary.jsx';
 import AuraVoice            from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge       from './components/cognitive-forge/CognitiveForge.jsx';
@@ -137,6 +137,11 @@ export default function App() {
     if (!resumeBanner) {
       setTab(profileData.primaryTab || 'forge');
       profileTabSetRef.current = true;
+    }
+    // Persist baselineArousalScore to MongoDB (fire-and-forget; non-fatal).
+    // The score is already in Zustand for immediate in-session use.
+    if (userId && profileData.baselineArousalScore != null) {
+      stateApi.patchIntake(userId, profileData.baselineArousalScore).catch(() => {});
     }
   };
 
