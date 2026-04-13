@@ -8,6 +8,7 @@
 //  • Higher contrast game backgrounds
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wind, Sparkles, RotateCcw, Trash2, Zap, Trophy, Flame,
@@ -19,6 +20,7 @@ import confetti from 'canvas-confetti';
 import Matter from 'matter-js';
 import useStore from '../../store/useStore.js';
 import { forgeApi } from '../../services/api.js';
+import PerceptionProbe from '../PerceptionProbe.jsx';
 
 const { Engine, Render, Runner, World, Bodies, Body, Composite, Events, Mouse, MouseConstraint } = Matter;
 
@@ -109,16 +111,13 @@ const derivePredictedEffects = (gameId, metrics) => {
           : 'Slow scanning — significant attention deficit; clinical follow-up recommended.');
       break;
     }
-    case 'breathe_flow': {
-      const avgDeviation = extraData.avgDeviation || 50, cycles = extraData.cycles || 0;
-      eff.stressReduction    = Math.min(10, Math.round(cycles * 0.8 + 3));
-      eff.dopamineActivation = 4;
-      eff.focusScore         = Math.min(10, Math.round((100 - avgDeviation) * 0.08 + 2));
-      eff.arousalLevel       = avgDeviation > 40 ? 'high' : avgDeviation > 20 ? 'moderate' : 'low';
-      eff.clinicalNote = `Breathe Flow: ${cycles} cycles, avg deviation ${avgDeviation}%. `
-        + (avgDeviation < 20 ? 'Excellent parasympathetic activation; high calm capacity.'
-          : avgDeviation < 40 ? 'Moderate breathing synchrony; partial relaxation achieved.'
-          : 'Difficulty matching guide — elevated sympathetic tone; likely anxiety state.');
+    case 'perception_probe': {
+      eff.stressReduction    = 2;
+      eff.dopamineActivation = 3;
+      eff.focusScore         = accuracy === 100 ? 8 : 4;
+      eff.arousalLevel       = accuracy === 100 ? 'low' : 'high';
+      eff.clinicalNote = `Perception Probe: Latency ${avgReactionMs}ms. `
+        + (accuracy === 100 ? 'Demonstrated cognitive flexibility; perspective switch achieved quickly.' : 'High cognitive rigidity detected; unable to switch perspective context (perceptual locking observed).');
       break;
     }
     default: eff.clinicalNote = `${gameId}: ${interactions} interactions in ${durationSeconds}s.`;
@@ -135,7 +134,7 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
   const colorSort  = getGame('color_sort');
   const memory     = getGame('memory_pulse');
   const numDash    = getGame('number_dash');
-  const breathe    = getGame('breathe_flow');
+  const perception = getGame('perception_probe');
   const wordSmash  = getGame('word_smash');
 
   // Stress Score (0-10, higher = more stress)
@@ -143,9 +142,9 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
     ? worries.reduce((s,w) => s + (w.weight||5), 0) / worries.length : 5;
   const worryStress = (avgWorryWeight / 10) * 4;
   const squeezeStress = squeeze ? (100 - (squeeze.extraData?.avgQuality||50)) / 25 : 0;
-  const breatheStress = breathe ? (breathe.extraData?.avgDeviation||50) / 25 : 0;
+  const perceptionRigid = perception ? (perception.accuracy === 100 ? 0 : 4) : 0;
   const wordStress    = wordSmash ? Math.min(2, wordSmash.score / 5) : 0;
-  const stressScore   = Math.min(10, Math.round((worryStress + squeezeStress + breatheStress + wordStress) * 10) / 10);
+  const stressScore   = Math.min(10, Math.round((worryStress + squeezeStress + perceptionRigid + wordStress) * 10) / 10);
 
   // ADHD Signal (0-10, higher = more ADHD indicators)
   const memLevel     = memory?.extraData?.maxLevel || 0;
@@ -160,10 +159,10 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
 
   // Anxiety Level (0-10)
   const squeezeQ   = squeeze?.extraData?.avgQuality || 100;
-  const breatheDev = breathe?.extraData?.avgDeviation || 0;
+  const rigidAnx   = perception ? (perception.accuracy === 100 ? 0 : 4) : 0;
   const anxietyLevel = Math.min(10, Math.round((
     ((100 - squeezeQ) / 20) +
-    (breatheDev / 20) +
+    rigidAnx +
     (avgWorryWeight > 7 ? 2 : avgWorryWeight > 5 ? 1 : 0)
   ) * 10) / 10);
 
@@ -177,7 +176,7 @@ const computeHealthProfile = (gameSessions, worries, destroyedCount) => {
   // Emotional Regulation (0-10, higher = better)
   const emotionalReg = Math.min(10, Math.round((
     (squeeze ? (squeeze.extraData?.avgQuality||50) / 20 : 2.5) +
-    (breathe ? (100 - (breathe.extraData?.avgDeviation||50)) / 25 : 2.5)
+    (perception ? (perception.accuracy === 100 ? 5 : 1) : 2.5)
   ) * 10) / 10);
 
   // Overall wellbeing (0-100)
@@ -1146,7 +1145,7 @@ const GAME_DEFS = [
   { id:'word_smash',      name:'Word Smash',      emoji:'💥', color:'#c4b5fd', tagline:'Crush negativity',       mechanic:'Click to smash', side:'left', Component:WordSmash      },
   { id:'memory_pulse',    name:'Memory Pulse',    emoji:'🧠', color:'#a78bfa', tagline:'Test working memory',    mechanic:'Sequence repeat',side:'right', Component:MemoryPulse    },
   { id:'number_dash',     name:'Number Dash',     emoji:'🔢', color:'#ffb300', tagline:'Schulte attention test', mechanic:'Order 1→16',    side:'right', Component:NumberDash     },
-  { id:'breathe_flow',    name:'Breathe Flow',    emoji:'🌬️', color:'#5eead4', tagline:'Guided breathing calm',  mechanic:'Hold to inhale', side:'right', Component:BreatheFlow    },
+  { id:'perception_probe',name:'Perspective',     emoji:'👁️', color:'#5eead4', tagline:'Cognitive rigidity test', mechanic:'Illusion switch', side:'right', Component:PerceptionProbe    },
 ];
 
 // Physics helpers
@@ -1504,38 +1503,46 @@ export default function CognitiveForge() {
         </motion.div>
       )}
 
-      {/* Game modal — dynamic height per game type */}
-      <AnimatePresence>
-        {activeGame&&ActiveGameComponent&&(
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{position:'fixed',inset:0,zIndex:500,background:'rgba(2,9,21,0.94)',backdropFilter:'blur(28px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-            <motion.div initial={{scale:0.9,y:24}} animate={{scale:1,y:0}} exit={{scale:0.88,opacity:0}}
-              style={{width:'100%',
-                maxWidth: activeGame==='number_dash'?480:activeGame==='memory_pulse'?460:activeGame==='breathe_flow'?460:530,
-                maxHeight:'88dvh', minHeight:460,
-                background:'rgba(7,16,32,0.98)',
-                border:`1px solid ${activeGameDef?.color||'rgba(255,255,255,0.1)'}30`,
-                borderRadius:24, overflow:'hidden', display:'flex', flexDirection:'column',
-                boxShadow:`0 40px 90px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)`}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 18px 0',flexShrink:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:9}}>
-                  <span style={{fontSize:22}}>{activeGameDef?.emoji}</span>
-                  <div>
-                    <p style={{fontSize:14,fontWeight:800,color:'var(--text-1)',letterSpacing:'-0.02em'}}>{activeGameDef?.name}</p>
-                    <p style={{fontSize:9.5,color:'var(--text-3)'}}>Interaction data feeds your behavioral health profile</p>
+      {/* Game modal — fixed overlay, decoupled from document flow via Portal */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {activeGame&&ActiveGameComponent&&(
+            <motion.div
+              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{scale:0.9,y:24}} animate={{scale:1,y:0}} exit={{scale:0.88,opacity:0}}
+                className="relative z-10 w-full"
+                style={{
+                  maxWidth: activeGame==='number_dash'?480:activeGame==='memory_pulse'?460:activeGame==='perception_probe'?600:530,
+                  maxHeight:'88dvh', minHeight:460,
+                  background:'rgba(7,16,32,0.98)',
+                  border:`1px solid ${activeGameDef?.color||'rgba(255,255,255,0.1)'}30`,
+                  borderRadius:24, overflow:'hidden', display:'flex', flexDirection:'column',
+                  boxShadow:`0 40px 90px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)`
+                }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 18px 0',flexShrink:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:9}}>
+                    <span style={{fontSize:22}}>{activeGameDef?.emoji}</span>
+                    <div>
+                      <p style={{fontSize:14,fontWeight:800,color:'var(--text-1)',letterSpacing:'-0.02em'}}>{activeGameDef?.name}</p>
+                      <p style={{fontSize:9.5,color:'var(--text-3)'}}>Interaction data feeds your behavioral health profile</p>
+                    </div>
                   </div>
+                  <button onClick={()=>setActiveGame(null)} style={{width:30,height:30,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',cursor:'pointer'}}>
+                    <X size={13}/>
+                  </button>
                 </div>
-                <button onClick={()=>setActiveGame(null)} style={{width:30,height:30,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',cursor:'pointer'}}>
-                  <X size={13}/>
-                </button>
-              </div>
-              <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',minHeight:0}}>
-                <ActiveGameComponent onSessionEnd={handleGameSessionEnd}/>
-              </div>
+                <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',minHeight:0}}>
+                  <ActiveGameComponent onSessionEnd={handleGameSessionEnd}/>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Toast */}
       <AnimatePresence>

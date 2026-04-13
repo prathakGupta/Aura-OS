@@ -71,6 +71,7 @@ export const buildClinicalReportPdfBuffer = async (report) => {
     .text((report.riskLevel || 'WATCH').toUpperCase(), riskX + 4, 43, { width: 68, align: 'center' });
 
   doc.fillColor('#111827');
+  doc.x = margin;
   doc.y = 100;
   doc.moveDown(0.5);
 
