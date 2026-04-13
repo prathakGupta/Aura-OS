@@ -1534,7 +1534,7 @@ export default function CognitiveForge() {
                     <X size={13}/>
                   </button>
                 </div>
-                <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',minHeight:0}}>
+                <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',minHeight:350,position:'relative'}}>
                   <ActiveGameComponent onSessionEnd={handleGameSessionEnd}/>
                 </div>
               </motion.div>

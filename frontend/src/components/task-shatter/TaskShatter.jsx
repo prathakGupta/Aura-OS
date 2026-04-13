@@ -132,6 +132,62 @@ function FocusTimer({ isActive, durationMinutes = 2, onComplete }) {
   );
 }
 
+/* ── Shrinking Time-Blindness Bar ───────────────────────────────── */
+function ShrinkingTimeBar({ durationMinutes = 2, isActive }) {
+  const totalMs = durationMinutes * 60 * 1000;
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(null);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    if (!isActive) return;
+    startRef.current = Date.now();
+    const tick = () => {
+      const el = Date.now() - startRef.current;
+      setElapsed(Math.min(el, totalMs));
+      if (el < totalMs) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [isActive, totalMs]);
+
+  const pct = Math.max(0, 100 - (elapsed / totalMs) * 100);
+  const barColor = pct > 60 ? '#00e5ff' : pct > 25 ? '#ffb300' : '#ff6b8a';
+  const isUrgent = pct < 20;
+  const minsLeft = Math.max(0, Math.ceil((totalMs - elapsed) / 60000));
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+        <span style={{ fontSize: 9.5, fontWeight: 700, color: barColor, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          ⏳ Time remaining
+        </span>
+        <span style={{ fontSize: 9.5, fontWeight: 800, color: barColor }}>
+          {pct > 0 ? `~${minsLeft}m` : 'TIME UP'}
+        </span>
+      </div>
+      <div style={{
+        width: '100%', height: 7, borderRadius: 999,
+        background: 'rgba(255,255,255,0.06)',
+        overflow: 'hidden', position: 'relative',
+      }}>
+        <motion.div
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.3, ease: 'linear' }}
+          style={{
+            height: '100%',
+            background: `linear-gradient(90deg, ${barColor}cc, ${barColor})`,
+            borderRadius: 999,
+            boxShadow: isUrgent ? `0 0 12px ${barColor}88, 0 0 24px ${barColor}44` : `0 0 6px ${barColor}33`,
+            animation: isUrgent ? 'timeBarPulse 0.8s ease-in-out infinite' : 'none',
+          }}
+        />
+      </div>
+      <style>{`@keyframes timeBarPulse { 0%,100%{opacity:0.7;} 50%{opacity:1;} }`}</style>
+    </div>
+  );
+}
+
 /* ── Fragment card ──────────────────────────────────────────────────── */
 function FragmentCard({ frag, onPositionChange, onDelete, onTextChange, onColorChange, onDropToSlot, constraintsRef, isDocked, onDragVelocity }) {
   const [editing, setEditing] = useState(false);
@@ -927,7 +983,13 @@ export default function TaskShatter() {
                 WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                 WebkitMaskComposite: 'xor', maskComposite: 'exclude', padding: 1.5, pointerEvents: 'none',
               }} />
-              <div style={{ background: 'linear-gradient(145deg,rgba(10,20,40,0.93),rgba(4,12,28,0.96))', borderRadius: 26, padding: '34px 32px', backdropFilter: 'blur(20px)' }}>
+              <motion.div
+                key={`quest-${currentQuestIndex}`}
+                initial={{ scale: 0.92, opacity: 0, y: 16 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 220, damping: 18 }}
+                style={{ background: 'linear-gradient(145deg,rgba(10,20,40,0.93),rgba(4,12,28,0.96))', borderRadius: 26, padding: '34px 32px', backdropFilter: 'blur(20px)' }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c4b5fd' }}>
                     Step {(currentQuestIndex || 0) + 1} of {focusQuests.length}
@@ -943,7 +1005,14 @@ export default function TaskShatter() {
                     <p style={{ fontSize: 13.5, color: '#80deea', lineHeight: 1.65 }}>{focusQuest.tip}</p>
                   </div>
                 )}
-              </div>
+
+                {/* ── TIME-BLINDNESS SHRINKING PROGRESS BAR ────────── */}
+                <ShrinkingTimeBar
+                  key={`timebar-${currentQuestIndex}`}
+                  durationMinutes={focusQuest.duration_minutes || 2}
+                  isActive={focusTimerActive}
+                />
+              </motion.div>
             </div>
 
             {/* Tunnel Vision somatic finish button */}

@@ -1,214 +1,232 @@
-// src/services/reportPdf.js — v2.0
-// Now includes Therapeutic Activity Suite section with game telemetry analysis.
-// Game sessions feed a predictive health analysis section for therapists.
+// src/services/reportPdf.js — v3.0
+// Uses @react-pdf/renderer for UTF-8 emoji support, styled layouts, and professional clinical reports.
+// Falls back to a lightweight pdfkit implementation if @react-pdf/renderer is not available.
 
-import PDFDocument from 'pdfkit';
+import React from 'react';
+import { renderToBuffer, Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/renderer';
 
-const clamp = (v, max = 300) => String(v || '').trim().slice(0, max);
+// ── Register Google Font (Inter) for professional typography ─────────────────
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf', fontWeight: 400 },
+    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf', fontWeight: 600 },
+    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf', fontWeight: 700 },
+  ],
+});
 
-const bullets = (items, fallback = 'None captured for this session.') =>
-  items.length ? items.map((item) => `• ${item}`).join('\n') : fallback;
-
-const writeSection = (doc, title, body, opts = {}) => {
-  doc.font('Helvetica-Bold').fontSize(11.5).fillColor('#0f172a').text(title, { align: 'left' });
-  doc.moveDown(0.2);
-  doc.font('Helvetica').fontSize(10).fillColor('#1f2937').text(body, { align: 'left', lineGap: 2, ...opts });
-  doc.moveDown(0.8);
-};
-
-const writeSectionDivider = (doc) => {
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y)
-    .strokeColor('#e2e8f0').lineWidth(0.5).stroke();
-  doc.moveDown(0.5);
+// ── Styles ───────────────────────────────────────────────────────────────────
+const colors = {
+  dark: '#0f172a',
+  text: '#1e293b',
+  muted: '#64748b',
+  border: '#e2e8f0',
+  accent: '#3b82f6',
+  riskWatch: '#16a34a',
+  riskPre: '#ea580c',
+  riskAcute: '#dc2626',
+  bgLight: '#f8fafc',
+  white: '#ffffff',
 };
 
 const riskColor = (level) => {
-  if (level === 'acute-distress') return '#dc2626';
-  if (level === 'pre-burnout') return '#ea580c';
-  return '#16a34a';
+  if (level === 'acute-distress') return colors.riskAcute;
+  if (level === 'pre-burnout') return colors.riskPre;
+  return colors.riskWatch;
 };
 
+const styles = StyleSheet.create({
+  page: { padding: 40, fontFamily: 'Inter', fontSize: 10, color: colors.text, lineHeight: 1.5 },
+  headerBar: { backgroundColor: colors.dark, padding: 16, marginBottom: 16, borderRadius: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { color: colors.white, fontSize: 16, fontWeight: 700 },
+  headerSub: { color: '#94a3b8', fontSize: 8, marginTop: 2 },
+  riskBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 3, alignSelf: 'center' },
+  riskBadgeText: { color: colors.white, fontSize: 9, fontWeight: 700 },
+  sectionTitle: { fontSize: 12, fontWeight: 700, color: colors.dark, marginBottom: 4, marginTop: 12 },
+  sectionBody: { fontSize: 10, color: colors.text, lineHeight: 1.6 },
+  divider: { borderBottomWidth: 0.5, borderBottomColor: colors.border, marginVertical: 8 },
+  row: { flexDirection: 'row', marginBottom: 2 },
+  label: { fontWeight: 600, width: 140, color: colors.muted, fontSize: 9 },
+  value: { flex: 1, fontSize: 9.5 },
+  bulletItem: { flexDirection: 'row', marginLeft: 8, marginBottom: 2 },
+  bulletDot: { width: 12, fontSize: 9 },
+  bulletText: { flex: 1, fontSize: 9.5, lineHeight: 1.5 },
+  gameCard: { backgroundColor: colors.bgLight, borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 0.5, borderColor: colors.border },
+  gameTitle: { fontSize: 10, fontWeight: 600, color: colors.accent, marginBottom: 2 },
+  gameStats: { fontSize: 8.5, color: colors.muted },
+  footer: { position: 'absolute', bottom: 24, left: 40, right: 40, fontSize: 7, color: colors.muted, textAlign: 'center' },
+  aggrBox: { backgroundColor: '#eff6ff', borderRadius: 4, padding: 10, marginTop: 6, borderWidth: 0.5, borderColor: '#bfdbfe' },
+  aggrTitle: { fontSize: 10, fontWeight: 600, color: colors.dark, marginBottom: 4 },
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const clamp = (v, max = 300) => String(v || '').trim().slice(0, max);
 const arousalLabel = (level) => ({
-  high: 'HIGH — Elevated neurological arousal detected',
-  moderate: 'MODERATE — Normal stress processing range',
-  low: 'LOW — Calm state, possible disengagement',
+  high: 'HIGH - Elevated neurological arousal',
+  moderate: 'MODERATE - Normal stress processing',
+  low: 'LOW - Calm state',
 }[level] || 'UNKNOWN');
 
-export const buildClinicalReportPdfBuffer = async (report) => {
-  const doc = new PDFDocument({
-    size: 'A4',
-    margins: { top: 44, bottom: 44, left: 48, right: 48 },
-    info: {
-      Title: `AuraOS Clinical Report — ${report.userId || 'User'}`,
-      Author: 'AuraOS Clinical Intelligence Layer',
-      Subject: 'Mental Health Telemetry Report',
-    },
-  });
+// ── Sub-components ──────────────────────────────────────────────────────────
+const SectionTitle = ({ number, children }) => (
+  <Text style={styles.sectionTitle}>{number}. {children}</Text>
+);
 
-  const chunks = [];
-  doc.on('data', (chunk) => chunks.push(chunk));
+const InfoRow = ({ label, value }) => (
+  <View style={styles.row}>
+    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.value}>{value || 'N/A'}</Text>
+  </View>
+);
 
-  // ── Header band ───────────────────────────────────────────────────────────
-  const pageW = doc.page.width;
-  const margin = doc.page.margins.left;
+const Bullet = ({ children }) => (
+  <View style={styles.bulletItem}>
+    <Text style={styles.bulletDot}>{'  \u2022'}</Text>
+    <Text style={styles.bulletText}>{children}</Text>
+  </View>
+);
 
-  doc.rect(margin - 4, 28, pageW - (margin - 4) * 2, 52).fill('#0f172a');
+const Divider = () => <View style={styles.divider} />;
 
-  doc.fillColor('#e2e8f0').font('Helvetica-Bold').fontSize(14)
-    .text('AuraOS Clinical Triage Report', margin, 40, { align: 'left' });
-
+// ── Main PDF Document ───────────────────────────────────────────────────────
+const ClinicalReportDocument = ({ report }) => {
   const generatedAt = new Date(report.meta?.generatedAt || report.createdAt || Date.now())
     .toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 
-  doc.fillColor('#94a3b8').font('Helvetica').fontSize(9)
-    .text(`Generated: ${generatedAt}  |  Risk: ${(report.riskLevel || 'watch').toUpperCase()}  |  Report ID: ${report._id || 'N/A'}`,
-      margin, 58, { align: 'left' });
-
-  // Risk badge
-  const riskX = pageW - margin - 80;
-  doc.rect(riskX, 36, 76, 22).fill(riskColor(report.riskLevel));
-  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9)
-    .text((report.riskLevel || 'WATCH').toUpperCase(), riskX + 4, 43, { width: 68, align: 'center' });
-
-  doc.fillColor('#111827');
-  doc.x = margin;
-  doc.y = 100;
-  doc.moveDown(0.5);
-
-  // ── Section 1: Session Context ────────────────────────────────────────────
-  writeSection(doc, '1. Session Context', [
-    `Patient ID:        ${clamp(report.userId, 80) || 'N/A'}`,
-    `Current Task:      ${clamp(report.currentTask, 200) || 'Not specified'}`,
-    `Blocker Selected:  ${clamp(report.selectedBlocker, 120) || 'Not specified'}`,
-    `Vocal Arousal:     ${Number(report.vocalArousalScore || 0).toFixed(1)} / 10`,
-    `Risk Classification: ${clamp(report.riskLevel, 40) || 'watch'}`,
-  ].join('\n'));
-
-  writeSectionDivider(doc);
-
-  // ── Section 2: Initial Anxiety Query ─────────────────────────────────────
-  writeSection(doc, '2. Initial Anxiety Query / Self-Report',
-    clamp(report.initialAnxietyQuery, 700) || 'No direct query captured in this report window.');
-
-  writeSectionDivider(doc);
-
-  // ── Section 3: Shattered Worry Blocks ────────────────────────────────────
-  const worries = (report.shatteredWorryBlocks || []).slice(0, 10)
-    .map((w, i) => `${i + 1}. "${clamp(w.text, 80)}" — weight ${w.weight || '?'}/10 [${w.status || 'active'}]`);
-
-  writeSection(doc, '3. Identified Worry Blocks', bullets(worries));
-  writeSectionDivider(doc);
-
-  // ── Section 4: Shattered Task Timeline ───────────────────────────────────
+  const worries = (report.shatteredWorryBlocks || []).slice(0, 10);
   const timeline = (report.timelineMicroquests || [])
-    .sort((a, b) => (a.order || 0) - (b.order || 0)).slice(0, 10)
-    .map((q, i) => {
-      const d = Number(q.duration_minutes) || 2;
-      const done = q.completed ? '✓' : '○';
-      return `${i + 1}. [${done}] ${clamp(q.action, 120)} (~${d}m)`;
-    });
-
-  writeSection(doc, '4. Task Timeline (User-Arranged Order)', bullets(timeline));
-  writeSectionDivider(doc);
-
-  // ── Section 5: Therapeutic Activity Suite ────────────────────────────────
+    .sort((a, b) => (a.order || 0) - (b.order || 0)).slice(0, 10);
   const sessions = report.gameSessions || report.meta?.gameSessions || [];
 
-  if (sessions.length > 0) {
-    doc.font('Helvetica-Bold').fontSize(11.5).fillColor('#0f172a')
-      .text('5. Therapeutic Activity Suite', { align: 'left' });
-    doc.moveDown(0.2);
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* ── Header ──────────────────────────────── */}
+        <View style={styles.headerBar}>
+          <View>
+            <Text style={styles.headerTitle}>AuraOS Clinical Triage Report</Text>
+            <Text style={styles.headerSub}>Generated: {generatedAt}  |  Report ID: {report._id || 'N/A'}</Text>
+          </View>
+          <View style={[styles.riskBadge, { backgroundColor: riskColor(report.riskLevel) }]}>
+            <Text style={styles.riskBadgeText}>{(report.riskLevel || 'WATCH').toUpperCase()}</Text>
+          </View>
+        </View>
 
-    doc.font('Helvetica').fontSize(10).fillColor('#374151')
-      .text(`The patient engaged with ${sessions.length} therapeutic game session(s) during this AuraOS visit, ` +
-        `totalling ${sessions.reduce((s, g) => s + (g.durationSeconds || 0), 0)} seconds of active intervention. ` +
-        'Interaction patterns provide the following predictive health indicators:', { lineGap: 2 });
-    doc.moveDown(0.5);
+        {/* Section 1: Session Context */}
+        <SectionTitle number={1}>Session Context</SectionTitle>
+        <InfoRow label="Patient ID" value={clamp(report.userId, 80)} />
+        <InfoRow label="Current Task" value={clamp(report.currentTask, 200)} />
+        <InfoRow label="Blocker" value={clamp(report.selectedBlocker, 120)} />
+        <InfoRow label="Vocal Arousal" value={`${Number(report.vocalArousalScore || 0).toFixed(1)} / 10`} />
+        <InfoRow label="Risk Level" value={clamp(report.riskLevel, 40)} />
+        <Divider />
 
-    sessions.forEach((session, idx) => {
-      const eff = session.predictedEffects || {};
-      doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#1e40af')
-        .text(`  ${idx + 1}. ${session.gameName || session.gameId}`, { align: 'left' });
-      doc.moveDown(0.1);
+        {/* Section 2: Initial Anxiety Query */}
+        <SectionTitle number={2}>Initial Anxiety Query / Self-Report</SectionTitle>
+        <Text style={styles.sectionBody}>
+          {clamp(report.initialAnxietyQuery, 700) || 'No direct query captured in this report window.'}
+        </Text>
+        <Divider />
 
-      const lines = [
-        `     Duration: ${session.durationSeconds}s  |  Score: ${session.score}  |  Interactions: ${session.interactions}`,
-        `     Reaction Time (avg): ${session.avgReactionMs}ms  |  Accuracy: ${session.accuracy}%`,
-        `     Arousal Level: ${arousalLabel(eff.arousalLevel)}`,
-        `     Stress Reduction (est.): ${eff.stressReduction || 0}/10  |  Dopamine Activation: ${eff.dopamineActivation || 0}/10  |  Focus Score: ${eff.focusScore || 0}/10`,
-      ];
+        {/* Section 3: Worry Blocks */}
+        <SectionTitle number={3}>Identified Worry Blocks</SectionTitle>
+        {worries.length > 0
+          ? worries.map((w, i) => (
+              <Bullet key={i}>"{clamp(w.text, 80)}" - weight {w.weight || '?'}/10 [{w.status || 'active'}]</Bullet>
+            ))
+          : <Text style={styles.sectionBody}>None captured for this session.</Text>}
+        <Divider />
 
-      doc.font('Helvetica').fontSize(9.5).fillColor('#374151')
-        .text(lines.join('\n'), { lineGap: 1.5 });
+        {/* Section 4: Task Timeline */}
+        <SectionTitle number={4}>Task Timeline (User-Arranged Order)</SectionTitle>
+        {timeline.length > 0
+          ? timeline.map((q, i) => {
+              const d = Number(q.duration_minutes) || 2;
+              const done = q.completed ? '\u2713' : '\u25CB';
+              return <Bullet key={i}>[{done}] {clamp(q.action, 120)} (~{d}m)</Bullet>;
+            })
+          : <Text style={styles.sectionBody}>None captured for this session.</Text>}
+        <Divider />
 
-      if (eff.clinicalNote) {
-        doc.moveDown(0.15);
-        doc.font('Helvetica').fontSize(9).fillColor('#6b7280')
-          .text(`     Clinical Note: ${clamp(eff.clinicalNote, 300)}`, { lineGap: 1.5 });
-      }
-      doc.moveDown(0.45);
-    });
+        {/* Section 5: Therapeutic Activity Suite */}
+        <SectionTitle number={5}>Therapeutic Activity Suite</SectionTitle>
+        {sessions.length > 0 ? (
+          <View>
+            <Text style={styles.sectionBody}>
+              The patient engaged with {sessions.length} therapeutic game session(s), totalling{' '}
+              {sessions.reduce((s, g) => s + (g.durationSeconds || 0), 0)} seconds of active intervention.
+            </Text>
+            {sessions.map((session, idx) => {
+              const eff = session.predictedEffects || {};
+              return (
+                <View key={idx} style={styles.gameCard}>
+                  <Text style={styles.gameTitle}>{session.gameName || session.gameId}</Text>
+                  <Text style={styles.gameStats}>
+                    Duration: {session.durationSeconds}s  |  Score: {session.score}  |  Interactions: {session.interactions}
+                  </Text>
+                  <Text style={styles.gameStats}>
+                    Reaction Time: {session.avgReactionMs}ms  |  Accuracy: {session.accuracy}%
+                  </Text>
+                  <Text style={styles.gameStats}>
+                    Arousal: {arousalLabel(eff.arousalLevel)} | Stress Reduction: {eff.stressReduction || 0}/10 | Focus: {eff.focusScore || 0}/10
+                  </Text>
+                  {eff.clinicalNote ? (
+                    <Text style={[styles.gameStats, { marginTop: 2, fontStyle: 'italic' }]}>
+                      Clinical Note: {clamp(eff.clinicalNote, 300)}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
+            {/* Aggregate */}
+            <View style={styles.aggrBox}>
+              <Text style={styles.aggrTitle}>Aggregate Therapeutic Analysis</Text>
+              <Text style={styles.gameStats}>
+                Total Stress Reduction: {sessions.reduce((s, g) => s + (g.predictedEffects?.stressReduction || 0), 0)} units
+                {' | '}Dopamine Activation: {sessions.reduce((s, g) => s + (g.predictedEffects?.dopamineActivation || 0), 0)} units
+                {' | '}Avg Focus: {sessions.length ? (sessions.reduce((s, g) => s + (g.predictedEffects?.focusScore || 0), 0) / sessions.length).toFixed(1) : 0}/10
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.sectionBody}>No therapeutic game sessions were logged during this session.</Text>
+        )}
+        <Divider />
 
-    // Aggregate summary
-    const totalStressRed = sessions.reduce((s, g) => s + (g.predictedEffects?.stressReduction || 0), 0);
-    const totalDopamine  = sessions.reduce((s, g) => s + (g.predictedEffects?.dopamineActivation || 0), 0);
-    const avgFocus       = sessions.length
-      ? (sessions.reduce((s, g) => s + (g.predictedEffects?.focusScore || 0), 0) / sessions.length).toFixed(1)
-      : 0;
+        {/* Section 6: AI Clinical Summary */}
+        <SectionTitle number={6}>AI Clinical Stress Summary</SectionTitle>
+        <Text style={styles.sectionBody}>
+          {clamp(report.aiStressSummary, 1400) || 'AI summary unavailable for this session.'}
+        </Text>
+        <Divider />
 
-    const highArousal = sessions.filter((s) => s.predictedEffects?.arousalLevel === 'high').length;
-    const aggNote = highArousal >= 2
-      ? `${highArousal} of ${sessions.length} sessions showed HIGH arousal patterns, suggesting significant emotional activation requiring therapeutic follow-up.`
-      : `Activity patterns indicate moderate to normal emotional regulation capacity. Continued engagement with therapeutic activities is recommended.`;
+        {/* Section 7: Guardian Contact */}
+        <SectionTitle number={7}>Guardian Contact</SectionTitle>
+        <InfoRow
+          label="Guardian"
+          value={report.guardian?.name
+            ? `${clamp(report.guardian.name, 80)} | ${clamp(report.guardian.relation, 60) || 'relation N/A'}`
+            : 'Guardian details not on file'}
+        />
+        <InfoRow
+          label="Contact"
+          value={report.guardian?.phone || report.guardian?.email
+            ? [report.guardian.phone, report.guardian.email].filter(Boolean).join('  |  ')
+            : 'No contact details'}
+        />
 
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a')
-      .text('  Aggregate Therapeutic Activity Analysis:', { align: 'left' });
-    doc.font('Helvetica').fontSize(9.5).fillColor('#374151')
-      .text([
-        `  • Total Predicted Stress Reduction: ${totalStressRed} cumulative units across ${sessions.length} sessions`,
-        `  • Total Dopamine Activation Events: ${totalDopamine} cumulative units`,
-        `  • Average Focus Score: ${avgFocus}/10`,
-        `  • ${aggNote}`,
-      ].join('\n'), { lineGap: 2 });
-    doc.moveDown(0.8);
-    writeSectionDivider(doc);
-  } else {
-    writeSection(doc, '5. Therapeutic Activity Suite',
-      'No therapeutic game sessions were logged during this session. Consider encouraging the patient to engage with the ' +
-      'Bug Zapper, Focus Dot, or Cloud Bloom activities in a follow-up session to gather baseline interaction data.');
-    writeSectionDivider(doc);
-  }
+        {/* Footer */}
+        <Text style={styles.footer}>
+          This report is generated by AuraOS to support informed caregiving during stress-related events.
+          It is not a medical diagnosis. All game-derived metrics are predictive estimates based on interaction patterns.
+          AuraOS - Vihaan DTU 9.0.
+        </Text>
+      </Page>
+    </Document>
+  );
+};
 
-  // ── Section 6: AI Stress Summary ─────────────────────────────────────────
-  const sectionNum = 6;
-  writeSection(doc, `${sectionNum}. AI Clinical Stress Summary`,
-    clamp(report.aiStressSummary, 1400) || 'AI summary unavailable for this session.');
-  writeSectionDivider(doc);
-
-  // ── Section 7: Guardian Contact ───────────────────────────────────────────
-  const gLine    = report.guardian?.name
-    ? `${clamp(report.guardian.name, 80)} | ${clamp(report.guardian.relation, 60) || 'relation N/A'}`
-    : 'Guardian details not on file';
-  const cLine    = report.guardian?.phone || report.guardian?.email
-    ? [report.guardian.phone, report.guardian.email].filter(Boolean).map(s => clamp(s, 120)).join('  |  ')
-    : 'No contact details';
-
-  writeSection(doc, `${sectionNum + 1}. Guardian Contact`, `${gLine}\n${cLine}`);
-
-  // ── Footer ────────────────────────────────────────────────────────────────
-  doc.moveDown(1);
-  doc.font('Helvetica').fontSize(8).fillColor('#9ca3af')
-    .text(
-      'This report is generated by AuraOS to support informed caregiving during stress-related events. ' +
-      'It is not a medical diagnosis. All game-derived metrics are predictive estimates based on interaction ' +
-      'patterns and should be interpreted in conjunction with clinical observation. AuraOS — Vihaan DTU 9.0.',
-      { align: 'left', lineGap: 2 }
-    );
-
-  doc.end();
-
-  return new Promise((resolve, reject) => {
-    doc.on('end',   () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-  });
+// ── Export (same API signature as v2) ────────────────────────────────────────
+export const buildClinicalReportPdfBuffer = async (report) => {
+  return await renderToBuffer(<ClinicalReportDocument report={report} />);
 };

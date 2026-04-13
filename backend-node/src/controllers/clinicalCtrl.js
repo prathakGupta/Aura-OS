@@ -94,19 +94,9 @@ const deliveryStatusFromResult = (result) => {
 export const triggerAlertHandler = async (req, res, next) => {
   try {
     const {
-      userId,
-      taskSummary,
-      currentTask,
-      blocker,
-      selectedBlocker,
-      vocalArousal,
-      vocalArousalScore,
-      emotion,
-      recentHistory,
-      guardianPhone,
-      guardianName,
-      guardianRelation,
-      alertPreference,
+      userId, taskSummary, currentTask, blocker, selectedBlocker,
+      vocalArousal, vocalArousalScore, emotion, recentHistory,
+      guardianPhone, guardianName, guardianRelation, alertPreference,
     } = req.body;
 
     if (!userId) throw new AppError('userId is required.', 400);
@@ -114,11 +104,8 @@ export const triggerAlertHandler = async (req, res, next) => {
     const resolvedTaskSummary = String(taskSummary || currentTask || 'an overwhelming task').trim();
     const resolvedBlocker = String(blocker || selectedBlocker || 'too_overwhelming').trim();
     const parsedArousal = Number(vocalArousal ?? vocalArousalScore);
-    const resolvedArousal = Number.isFinite(parsedArousal)
-      ? Math.min(10, Math.max(1, parsedArousal))
-      : 8;
-    const resolvedEmotion = emotion
-      || (resolvedArousal >= 8 ? 'high_anxiety' : resolvedArousal >= 5 ? 'mild_anxiety' : 'calm');
+    const resolvedArousal = Number.isFinite(parsedArousal) ? Math.min(10, Math.max(1, parsedArousal)) : 8;
+    const resolvedEmotion = emotion || (resolvedArousal >= 8 ? 'high_anxiety' : resolvedArousal >= 5 ? 'mild_anxiety' : 'calm');
 
     const user = await UserState.findOrCreate(userId);
 
@@ -135,24 +122,16 @@ export const triggerAlertHandler = async (req, res, next) => {
 
     const telemetry = user.clinicalTelemetry || {};
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
     const recentExecEvents = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > dayAgo);
     const tasksAbandonedToday = recentExecEvents.filter((e) => e.status === 'abandoned').length;
     const recentForgeCount = (telemetry.forgeSessions || []).filter((e) => new Date(e.timestamp) > dayAgo).length;
-
-    const recentExecSummary = recentExecEvents
-      .slice(-8)
-      .map((e) => `${e.status} "${e.taskSummary || 'task'}"`)
-      .join(', ');
+    const recentExecSummary = recentExecEvents.slice(-8).map((e) => `${e.status} "${e.taskSummary || 'task'}"`).join(', ');
 
     const payloadHistory = (recentHistory && typeof recentHistory === 'object') ? recentHistory : null;
     const payloadHistoryParts = [];
-    if (payloadHistory?.tasksAbandonedToday !== undefined)
-      payloadHistoryParts.push(`Frontend signal: ${payloadHistory.tasksAbandonedToday} tasks abandoned today.`);
-    if (payloadHistory?.forgeUsage)
-      payloadHistoryParts.push(`Frontend forge usage: ${payloadHistory.forgeUsage}.`);
-    if (payloadHistory?.selectedBlockerLabel)
-      payloadHistoryParts.push(`Frontend blocker label: ${payloadHistory.selectedBlockerLabel}.`);
+    if (payloadHistory?.tasksAbandonedToday !== undefined) payloadHistoryParts.push(`Frontend signal: ${payloadHistory.tasksAbandonedToday} tasks abandoned today.`);
+    if (payloadHistory?.forgeUsage) payloadHistoryParts.push(`Frontend forge usage: ${payloadHistory.forgeUsage}.`);
+    if (payloadHistory?.selectedBlockerLabel) payloadHistoryParts.push(`Frontend blocker label: ${payloadHistory.selectedBlockerLabel}.`);
 
     const recentPattern = [
       `Past 24h telemetry: ${tasksAbandonedToday} abandoned tasks, ${recentForgeCount} forge sessions.`,
@@ -162,12 +141,20 @@ export const triggerAlertHandler = async (req, res, next) => {
 
     let brief;
     try {
+      const snapshot = req.body.sessionSnapshot || {};
       brief = await generateGuardianBrief({
         userName: userId,
-        taskSummary: resolvedTaskSummary || 'an overwhelming task',
-        blocker: resolvedBlocker || 'too_overwhelming',
+        taskSummary: resolvedTaskSummary,
+        blocker: resolvedBlocker,
         vocalArousal: resolvedArousal,
         emotion: resolvedEmotion,
+        baselineArousalScore: telemetry.baselineArousalScore || snapshot.baselineArousalScore || null,
+        baselineProfile: telemetry.baselineProfile || snapshot.baselineProfile || {},
+        lastKnownActivity: req.body.lastKnownActivity || snapshot.lastKnownActivity || null,
+        worryBlocks: snapshot.worryBlocks || normalizeWorryBlocks([], user.vaultedWorries || []),
+        probeSessions: (telemetry.probeData || []).slice(-5).concat(snapshot.probeSessions || []),
+        questTelemetry: snapshot.questTelemetry || [],
+        gameSessions: snapshot.gameSessions || [],
         auraAction: 'Somatic interruption (5-second breathing exercise) deployed. Brown noise environment activated.',
         recentPatterns: recentPattern,
       });
@@ -177,9 +164,9 @@ export const triggerAlertHandler = async (req, res, next) => {
         subject: 'AuraOS Alert - Stress Spike Detected',
         analogy: 'A computer that has frozen because too many programmes tried to run at once.',
         vocal_analysis: `Vocal arousal detected at ${resolvedArousal}/10 - significantly elevated.`,
-        observed_pattern: `The user attempted "${resolvedTaskSummary}" but reported acute overwhelm. This is consistent with executive dysfunction freeze.`,
+        observed_pattern: `The user attempted "${resolvedTaskSummary}" but reported acute overwhelm. Executive dysfunction freeze pattern.`,
         aura_action_taken: 'A breathing exercise was deployed and a calming audio environment was activated.',
-        parent_action: 'Do not ask about the task for at least 20 minutes. Offer water and a brief walk. Use the phrase: "I see you are working really hard. Let\'s take a break together."',
+        parent_action: 'Offer water and a brief walk. Try: "I see you are working really hard. Let\'s take a break together."',
         risk_level: 'pre-burnout',
       };
     }
@@ -195,12 +182,7 @@ export const triggerAlertHandler = async (req, res, next) => {
 
     const resolvedGuardianPhone = guardianPhone || user.guardian?.phone;
     const channel = alertPreference || user.guardian?.alertPreference || 'whatsapp';
-    const deliveryResult = await sendGuardianAlert({
-      brief,
-      userName: userId,
-      guardianPhone: resolvedGuardianPhone,
-      channel,
-    });
+    const deliveryResult = await sendGuardianAlert({ brief, userName: userId, guardianPhone: resolvedGuardianPhone, channel });
 
     const lastSpike = user.clinicalTelemetry.stressSpikes[user.clinicalTelemetry.stressSpikes.length - 1];
     if (lastSpike) {
@@ -221,13 +203,9 @@ export const triggerAlertHandler = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
-      briefGenerated: true,
-      alertSent: deliveryResult.success,
-      channel: deliveryResult.channel,
-      riskLevel: brief.risk_level,
-      guardianConfigured: Boolean(resolvedGuardianPhone),
-      coachFeedback: brief.analogy,
+      success: true, briefGenerated: true, alertSent: deliveryResult.success,
+      channel: deliveryResult.channel, riskLevel: brief.risk_level,
+      guardianConfigured: Boolean(resolvedGuardianPhone), coachFeedback: brief.analogy,
     });
   } catch (err) {
     next(err);
@@ -245,10 +223,8 @@ export const logVocalStressHandler = async (req, res, next) => {
     user.clinicalTelemetry.vocalStressEvents.push({ emotion, arousalScore, taskContext });
     await user.save();
 
-    // Background triage check (non-blocking)
     evaluateBurnoutRisk(userId).then(async (risk) => {
       if (risk.atRisk && risk.riskLevel === 'acute-distress') {
-        // Auto-alert without user intervention for severe cases
         console.log(`[Triage] Auto-alert triggered for ${userId}: ${risk.riskLevel}`);
       }
     }).catch(() => {});
@@ -258,6 +234,7 @@ export const logVocalStressHandler = async (req, res, next) => {
     next(err);
   }
 };
+
 
 // ── POST /api/clinical/guardian ───────────────────────────────────────────────
 // Set or update the guardian contact for this user.
