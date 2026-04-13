@@ -210,7 +210,7 @@ function GameShell({ title, color, score, unit, onEnd, instruction, children }) 
   useEffect(() => { const t = setInterval(()=>setSecs(s=>s+1),1000); return()=>clearInterval(t); }, []);
   const m = Math.floor(secs/60), s = secs%60;
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+    <div style={{ display:'flex', flexDirection:'column', flex:1, height:'100%', width:'100%', minHeight:0 }}>
       <div style={{ padding:'12px 16px 8px', flexShrink:0 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
@@ -224,7 +224,9 @@ function GameShell({ title, color, score, unit, onEnd, instruction, children }) 
         </div>
       </div>
       <div style={{ flex:1, margin:'0 12px', borderRadius:14, overflow:'hidden', border:`1px solid ${color}25`, position:'relative' }}>
-        {children}
+        <div style={{ position:'absolute', inset:0 }}>
+          {children}
+        </div>
       </div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 16px 12px' }}>
         <span style={{ fontSize:10, color:'var(--text-3)', fontFamily:'monospace' }}>
