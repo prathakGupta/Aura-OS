@@ -491,6 +491,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
         : 'watch',
       shatteredWorryBlocks: normalizeWorryBlocks(sessionSnapshot?.shatteredWorryBlocks, user.vaultedWorries || []),
       timelineMicroquests: normalizeTimeline(sessionSnapshot?.timelineMicroquests, activeTask || null),
+      gameSessions: Array.isArray(sessionSnapshot?.gameSessions) ? sessionSnapshot.gameSessions : [],
       guardian: {
         name: toSafeString(user.guardian?.name, 120),
         email: toSafeString(user.guardian?.email, 200),
@@ -500,6 +501,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
       meta: {
         notes: toSafeString(sessionSnapshot?.notes, 1000),
         generatedAt: new Date(),
+        gameSessions: Array.isArray(sessionSnapshot?.gameSessions) ? sessionSnapshot.gameSessions : [],
       },
     });
 

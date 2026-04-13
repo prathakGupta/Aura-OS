@@ -1347,7 +1347,7 @@ export default function CognitiveForge() {
       </motion.div>
 
       {/* 3-column */}
-      <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+      <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap',justifyContent:'center'}}>
         {/* LEFT games */}
         <div style={{width:160,flexShrink:0,display:'flex',flexDirection:'column',gap:9,paddingTop:6}}>
           <p style={{fontSize:9,color:'var(--text-3)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',textAlign:'center',marginBottom:2}}>RELEASE</p>
@@ -1355,7 +1355,7 @@ export default function CognitiveForge() {
         </div>
 
         {/* CENTER forge */}
-        <div style={{flex:1,minWidth:0}}>
+        <div style={{flex:'1 1 280px',minWidth:0,maxWidth:'100%'}}>
           <AnimatePresence>
             {showInput&&(
               <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:0.97}} className="glass" style={{padding:20,marginBottom:16}}>

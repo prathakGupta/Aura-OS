@@ -598,7 +598,7 @@ export default function TaskShatter() {
             }}>
             <Zap size={24} color="white" />
           </motion.div>
-          <h1 style={{ fontSize: 'clamp(26px,5vw,36px)', fontWeight: 800, letterSpacing: '-0.045em', color: '#e8f4fb', lineHeight: 1.15, marginBottom: 10 }}>
+          <h1 className="title-font" style={{ fontSize: 'clamp(26px,5vw,36px)', fontWeight: 800, letterSpacing: '-0.045em', color: '#e8f4fb', lineHeight: 1.15, marginBottom: 10 }}>
             What's{' '}
             <span style={{ background: 'linear-gradient(135deg,#00e5ff,#c4b5fd)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               stopping you?
@@ -649,7 +649,7 @@ export default function TaskShatter() {
       <div style={{ ...dotGrid }} />
       <motion.div initial={{ opacity: 0, scale: 0.93, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 22 }}
         style={{ width: '100%', maxWidth: 500, padding: '0 22px', position: 'relative', zIndex: 1 }}>
-        <div style={{ background: 'rgba(6,14,30,0.9)', backdropFilter: 'blur(24px)', border: '1px solid rgba(0,229,255,0.15)', borderRadius: 28, padding: '34px 30px' }}>
+        <div className="glass" style={{ borderRadius: 28, padding: '34px 30px' }}>
           {/* Task preview */}
           <div style={{ background: 'rgba(0,229,255,0.04)', border: '1px solid rgba(0,229,255,0.12)', borderRadius: 14, padding: '12px 16px', marginBottom: 24 }}>
             <p style={{ fontSize: 10.5, color: '#00e5ff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Breaking down</p>
@@ -855,7 +855,7 @@ export default function TaskShatter() {
                 WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                 WebkitMaskComposite: 'xor', maskComposite: 'exclude', padding: 1.5, pointerEvents: 'none',
               }} />
-              <div style={{ background: 'linear-gradient(145deg,rgba(10,20,40,0.93),rgba(4,12,28,0.96))', borderRadius: 26, padding: '34px 32px', backdropFilter: 'blur(20px)' }}>
+              <div className="glass" style={{ borderRadius: 26, padding: '34px 32px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c4b5fd' }}>
                     Step {(currentQuestIndex || 0) + 1} of {focusQuests.length}
@@ -924,11 +924,10 @@ export default function TaskShatter() {
         <div style={{ ...dotGrid }} />
 
         {/* Top bar */}
-        <div style={{
+        <div className="glass" style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 22px',
-          background: 'rgba(2,9,21,0.9)', backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderRadius: 0,
         }}>
           <span className="badge badge-cyan"><Zap size={10} /> Shattered Canvas</span>
           <p style={{ fontSize: 12, color: '#4a6275', fontWeight: 500, textAlign: 'center', flex: 1, margin: '0 16px' }}>

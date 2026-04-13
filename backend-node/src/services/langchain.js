@@ -58,14 +58,45 @@ const GuardianBriefSchema = z.object({
 
 /* ── Groq client factory ───────────────────────────────────────────────── */
 const makeModel = (schema, name, temp = 0.38) => {
-  if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY is not set.');
-  const llm = new ChatGroq({
-    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
-    temperature: temp,
-    apiKey: process.env.GROQ_API_KEY,
-  });
-  return llm.withStructuredOutput(schema, { name, strict: true });
+  if (!process.env.GROQ_API_KEY) {
+    console.warn('[LangChain] GROQ_API_KEY is not set — using local fallback.');
+    return null;
+  }
+  try {
+    const llm = new ChatGroq({
+      model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+      temperature: temp,
+      apiKey: process.env.GROQ_API_KEY,
+    });
+    return llm.withStructuredOutput(schema, { name, strict: true });
+  } catch (err) {
+    console.warn('[LangChain] Failed to create Groq model:', err.message);
+    return null;
+  }
 };
+
+/* ── Local fallback generators (keep app working without AI) ──────────── */
+const localFallbackBreakdown = (task) => {
+  const words = task.trim().split(/\s+/);
+  const head = words.slice(0, 6).join(' ');
+  return [
+    { id: 1, action: `Open the app or folder needed for: ${head}`, tip: 'Starting is the hardest part — this counts.', duration_minutes: 1 },
+    { id: 2, action: `Write down the single very next physical step`, tip: 'Brains freeze on big things. Tiny is powerful.', duration_minutes: 2 },
+    { id: 3, action: `Do only that one step — nothing else`, tip: 'Momentum builds. One step is enough right now.', duration_minutes: 2 },
+    { id: 4, action: `Take a 30-second breath break, then decide: continue or stop`, tip: 'You already broke the freeze. That is a win.', duration_minutes: 1 },
+  ];
+};
+
+const localFallbackCoach = (task, blocker) => ({
+  coach_message: `${blocker || 'Overwhelm'} makes starting feel impossible — your brain is protecting you, not failing you. AuraOS is setting up a calming workspace to help you begin.`,
+  environment_strategy: 'brown_noise',
+  microquests: [
+    { id: 'step-1', text: `Open the workspace for: ${task.slice(0, 60)}`, tip: 'Just opening it counts as progress.', duration_minutes: 1, colorId: 'cyan' },
+    { id: 'step-2', text: 'Write the first tiny action on a sticky note or doc', tip: 'Externalizing the plan frees your working memory.', duration_minutes: 2, colorId: 'green' },
+    { id: 'step-3', text: 'Do only that one action — ignore everything else', tip: 'Tunnel vision is your friend right now.', duration_minutes: 2, colorId: 'green' },
+    { id: 'step-4', text: 'Pause for 30 seconds and decide your next move', tip: 'You already broke through. Momentum is real.', duration_minutes: 1, colorId: 'amber' },
+  ],
+});
 
 /* ── Neuroscience-backed system prompts ────────────────────────────────── */
 
@@ -122,12 +153,21 @@ RULES:
 export const breakdownTask = async (task) => {
   if (!task?.trim()) throw new Error('Task is required.');
   const model = makeModel(MicroQuestSchema, 'generate_microquests');
-  console.log(`[LangChain] Standard breakdown: "${task.slice(0, 80)}"`);
-  const result = await model.invoke([
-    new SystemMessage(STANDARD_SHATTER_PROMPT),
-    new HumanMessage(`Break this overwhelming task into 2-minute micro-steps: "${task}"`),
-  ]);
-  return result.microquests;
+  if (!model) {
+    console.warn('[LangChain] No AI model available — using local fallback for breakdown.');
+    return localFallbackBreakdown(task);
+  }
+  try {
+    console.log(`[LangChain] Standard breakdown: "${task.slice(0, 80)}"`);
+    const result = await model.invoke([
+      new SystemMessage(STANDARD_SHATTER_PROMPT),
+      new HumanMessage(`Break this overwhelming task into 2-minute micro-steps: "${task}"`),
+    ]);
+    return result.microquests;
+  } catch (err) {
+    console.warn('[LangChain] Groq breakdown failed, using fallback:', err.message);
+    return localFallbackBreakdown(task);
+  }
 };
 
 /* ── Export 2: Coach-aware breakdown ──────────────────────────────────── */
@@ -135,21 +175,44 @@ export const coachBreakdown = async (task, blocker) => {
   if (!task?.trim()) throw new Error('Task is required.');
   const model = makeModel(InitiationCoachSchema, 'initiation_coach');
   const blockerLabel = blocker || 'not specified';
-  console.log(`[LangChain] Coach breakdown: "${task.slice(0, 60)}" | blocker: ${blockerLabel}`);
-  const result = await model.invoke([
-    new SystemMessage(INITIATION_COACH_PROMPT),
-    new HumanMessage(
-      `Task to break down: "${task}"\nUser's blocker: "${blockerLabel}"\n\nGenerate coach response and micro-quests.`
-    ),
-  ]);
-  return result;
+  if (!model) {
+    console.warn('[LangChain] No AI model available — using local fallback for coach.');
+    return localFallbackCoach(task, blockerLabel);
+  }
+  try {
+    console.log(`[LangChain] Coach breakdown: "${task.slice(0, 60)}" | blocker: ${blockerLabel}`);
+    const result = await model.invoke([
+      new SystemMessage(INITIATION_COACH_PROMPT),
+      new HumanMessage(
+        `Task to break down: "${task}"\nUser's blocker: "${blockerLabel}"\n\nGenerate coach response and micro-quests.`
+      ),
+    ]);
+    return result;
+  } catch (err) {
+    console.warn('[LangChain] Groq coach breakdown failed, using fallback:', err.message);
+    return localFallbackCoach(task, blockerLabel);
+  }
 };
 
 /* ── Export 3: Guardian brief ─────────────────────────────────────────── */
 export const generateGuardianBrief = async ({
   userName, taskSummary, blocker, vocalArousal, emotion, auraAction, recentPatterns,
 }) => {
+  const localFallbackBrief = () => ({
+    subject: `AuraOS Alert — Stress Spike Detected for ${userName || 'user'}`,
+    analogy: 'A computer that has frozen because too many programmes tried to run at once.',
+    vocal_analysis: `Vocal arousal detected at ${vocalArousal ?? 'N/A'}/10.`,
+    observed_pattern: `The user attempted "${taskSummary || 'a task'}" but reported "${blocker || 'overwhelm'}". This is consistent with executive dysfunction freeze.`,
+    aura_action_taken: auraAction || 'A breathing exercise was deployed and a calming environment was activated.',
+    parent_action: 'Do not ask about the task for at least 20 minutes. Offer water and a brief walk. Try saying: "I see you are working really hard. Let\'s take a break together."',
+    risk_level: Number(vocalArousal) >= 8 ? 'acute-distress' : Number(vocalArousal) >= 6 ? 'pre-burnout' : 'watch',
+  });
+
   const model = makeModel(GuardianBriefSchema, 'guardian_brief', 0.42);
+  if (!model) {
+    console.warn('[LangChain] No AI model available — using local fallback for guardian brief.');
+    return localFallbackBrief();
+  }
 
   const contextBlock = `
 User: ${userName || 'the user'}
@@ -161,10 +224,15 @@ AuraOS intervention: ${auraAction || 'Somatic interruption deployed.'}
 24h pattern: ${recentPatterns || 'Elevated stress with task avoidance.'}
 `.trim();
 
-  console.log(`[LangChain] Guardian brief for: ${userName}`);
-  const result = await model.invoke([
-    new SystemMessage(GUARDIAN_BRIEF_PROMPT),
-    new HumanMessage(`Generate the Guardian Triage Brief:\n\n${contextBlock}`),
-  ]);
-  return result;
+  try {
+    console.log(`[LangChain] Guardian brief for: ${userName}`);
+    const result = await model.invoke([
+      new SystemMessage(GUARDIAN_BRIEF_PROMPT),
+      new HumanMessage(`Generate the Guardian Triage Brief:\n\n${contextBlock}`),
+    ]);
+    return result;
+  } catch (err) {
+    console.warn('[LangChain] Groq guardian brief failed, using fallback:', err.message);
+    return localFallbackBrief();
+  }
 };

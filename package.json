@@ -1,7 +1,7 @@
 {
   "name": "aura-os-root",
   "version": "1.0.0",
-  "description": "AuraOS monorepo root – Vihaan DTU 9.0 Hackathon",
+  "description": "AuraOS monorepo root",
   "private": true,
   "scripts": {
     "install:all": "npm i --prefix backend-node && npm i --prefix frontend",

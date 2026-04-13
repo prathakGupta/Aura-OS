@@ -5,4 +5,20 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.jsx';
 
-createRoot(document.getElementById('root')).render(<App />);
+const AmbientBackground = () => (
+  <>
+    <div className="ambient">
+      <div className="orb orb-1"></div>
+      <div className="orb orb-2"></div>
+      <div className="orb orb-3"></div>
+    </div>
+    <div className="grid-overlay"></div>
+  </>
+);
+
+createRoot(document.getElementById('root')).render(
+  <>
+    <AmbientBackground />
+    <App />
+  </>
+);

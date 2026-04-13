@@ -207,7 +207,7 @@ When someone is in crisis, they cannot navigate. So we made navigation unnecessa
 
 # AuraOS API Contracts
 > **Source of truth** for the interface between backend-node (Mayank) ↔ frontend (Mayank) ↔ backend-python (Deepanshu).
-> Last updated: Vihaan DTU 9.0 Hackathon
+> Last updated: AuraOS Beta
 
 ---
 

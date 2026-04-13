@@ -325,9 +325,8 @@ export default function AuraVoice() {
       <AnimatePresence>
         {isListening && auraEmotion !== 'calm' && (
           <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
-            style={{width:'100%',maxWidth:460,padding:'18px 22px',marginBottom:12,
-              background:'rgba(255,255,255,0.03)',backdropFilter:'blur(16px)',
-              border:'1px solid var(--border)',borderRadius:18}}>
+            className="glass"
+            style={{width:'100%',maxWidth:460,padding:'18px 22px',marginBottom:12}}>
             <p style={{fontSize:10.5,color:'var(--text-3)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>Grounding tip</p>
             <p style={{fontSize:15,color:'var(--text-1)',lineHeight:1.68}}>{em.tip}</p>
           </motion.div>
@@ -338,8 +337,8 @@ export default function AuraVoice() {
       <AnimatePresence>
         {auraTranscript && (
           <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
-            style={{width:'100%',maxWidth:460,padding:'14px 18px',marginBottom:10,
-              background:'rgba(255,255,255,0.025)',border:'1px solid var(--border)',borderRadius:14}}>
+            className="glass"
+            style={{width:'100%',maxWidth:460,padding:'14px 18px',marginBottom:10}}>
             <p style={{fontSize:10.5,color:'var(--text-3)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>You said</p>
             <p style={{fontSize:15,color:'var(--text-2)',lineHeight:1.68}}>{auraTranscript}</p>
           </motion.div>
@@ -350,9 +349,8 @@ export default function AuraVoice() {
       <AnimatePresence>
         {auraResponse && (
           <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}}
-            style={{width:'100%',maxWidth:460,padding:'18px 22px',
-              background:'linear-gradient(135deg,rgba(0,140,190,0.12),rgba(0,80,130,0.06))',
-              border:'1px solid rgba(0,229,255,0.2)',borderRadius:18}}>
+            className="glass"
+            style={{width:'100%',maxWidth:460,padding:'18px 22px', border:'1px solid rgba(0,229,255,0.3)'}}>
             <p style={{fontSize:10.5,color:'#00e5ff',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.1em',fontWeight:700}}>Aura</p>
             <p style={{fontSize:16,color:'var(--text-1)',lineHeight:1.75}}>{auraResponse}</p>
           </motion.div>

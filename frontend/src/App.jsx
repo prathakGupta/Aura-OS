@@ -10,6 +10,7 @@ import AuraVoice      from './components/aura-voice/AuraVoice.jsx';
 import CognitiveForge from './components/cognitive-forge/CognitiveForge.jsx';
 import TaskShatter    from './components/task-shatter/TaskShatter.jsx';
 import Dashboard      from './components/observer-portal/Dashboard.jsx';
+import LandingPage    from './components/landing/LandingPage.jsx';
 
 const TABS = [
   { id:'voice',   label:'Aura',    Icon:Mic,  color:'#00e5ff' },
@@ -23,6 +24,7 @@ export default function App() {
   const [initError, setInitError] = useState(false);
   const [resumeBanner, setResumeBanner] = useState(null);
   const [isDark, setIsDark] = useState(true);
+  const [showLanding, setShowLanding] = useState(!isPortalView);
 
   useEffect(() => {
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
@@ -63,6 +65,16 @@ export default function App() {
       <ErrorBoundary label="Observer Portal">
         <Dashboard />
       </ErrorBoundary>
+    );
+  }
+
+  if (showLanding) {
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div key="landing" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0, y:-20}} transition={{duration:0.4}} style={{width:'100vw', minHeight:'100vh'}}>
+          <LandingPage onLaunch={() => setShowLanding(false)} />
+        </motion.div>
+      </AnimatePresence>
     );
   }
 

@@ -3,6 +3,7 @@
 // All new clinical fields are ADDITIVE — existing fields untouched.
 
 import mongoose from 'mongoose';
+import { dbReady } from '../config/db.js';
 
 /* ── Sub-schemas ───────────────────────────────────────────── */
 
@@ -116,18 +117,47 @@ UserStateSchema.pre('save', function (next) {
 
 UserStateSchema.statics.findOrCreate = async function (userId, options = {}) {
   const { incrementSession = false } = options;
-  let user = await this.findOne({ userId });
-  if (!user) {
-    user = await this.create({ userId, sessionsCount: 1 });
-  } else {
-    if (incrementSession) {
-      user.sessionsCount += 1;
-    }
-    user.lastActive = new Date();
-    await user.save();
+
+  // Skip Mongoose entirely when DB is unreachable — instant fallback
+  if (!dbReady) {
+    return _inMemoryFallback(userId);
   }
-  return user;
+
+  try {
+    let user = await this.findOne({ userId });
+    if (!user) {
+      user = await this.create({ userId, sessionsCount: 1 });
+    } else {
+      if (incrementSession) {
+        user.sessionsCount += 1;
+      }
+      user.lastActive = new Date();
+      await user.save();
+    }
+    return user;
+  } catch (err) {
+    console.warn(`[UserState] DB error in findOrCreate(${userId}):`, err.message);
+    return _inMemoryFallback(userId);
+  }
 };
+
+function _inMemoryFallback(userId) {
+  return {
+    userId,
+    sessionsCount: 1,
+    lastActive: new Date(),
+    vaultedWorries: [],
+    taskHistory: [],
+    guardian: {},
+    clinicalTelemetry: { vocalStressEvents: [], forgeSessions: [], executiveFunction: [], stressSpikes: [] },
+    ensureClinicalTelemetry() {},
+    logVocalStress: async () => {},
+    logForgeSession: async () => {},
+    logExecFunction: async () => {},
+    save: async () => {},
+    _isInMemoryFallback: true,
+  };
+}
 
 UserStateSchema.methods.ensureClinicalTelemetry = function () {
   if (!this.clinicalTelemetry || typeof this.clinicalTelemetry !== 'object') {

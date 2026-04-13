@@ -111,45 +111,64 @@ export const extractWorries = async (rawText) => {
     return [];
   }
 
-  const client = getClient();
-  const modelCandidates = buildModelCandidates();
+  try {
+    const client = getClient();
+    const modelCandidates = buildModelCandidates();
 
-  console.log(`[Gemini] Extracting worries from text (${rawText.length} chars)...`);
+    console.log(`[Gemini] Extracting worries from text (${rawText.length} chars)...`);
 
-  let lastError = null;
+    let lastError = null;
 
-  for (const modelName of modelCandidates) {
-    try {
-      console.log(`[Gemini] Trying model: ${modelName}`);
-      const model = client.getGenerativeModel({
-        model: modelName,
-        systemInstruction: FORGE_SYSTEM_INSTRUCTION,
-        generationConfig: {
-          temperature: 0.2,
-          topP: 0.8,
-          maxOutputTokens: 1024,
-        },
-      });
+    for (const modelName of modelCandidates) {
+      try {
+        console.log(`[Gemini] Trying model: ${modelName}`);
+        const model = client.getGenerativeModel({
+          model: modelName,
+          systemInstruction: FORGE_SYSTEM_INSTRUCTION,
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            maxOutputTokens: 1024,
+          },
+        });
 
-      const result = await model.generateContent(rawText);
-      const responseText = result.response.text().trim();
-      console.log(`[Gemini] Raw response (${modelName}): ${responseText.substring(0, 200)}`);
+        const result = await model.generateContent(rawText);
+        
+        // Resilience: text() can throw if safety filters block the response
+        let responseText;
+        try {
+          responseText = result.response.text().trim();
+        } catch (safetyErr) {
+          console.warn(`[Gemini] Model ${modelName} safety block:`, safetyErr.message);
+          continue; // Try next model or fallback
+        }
 
-      return parseWorries(responseText);
-    } catch (err) {
-      lastError = err;
-      if (isModelNotFoundError(err)) {
-        console.warn(`[Gemini] Model unavailable: ${modelName}. Trying next candidate...`);
+        console.log(`[Gemini] Raw response (${modelName}): ${responseText.substring(0, 200)}`);
+        return parseWorries(responseText);
+      } catch (err) {
+        lastError = err;
+        console.warn(`[Gemini] Model ${modelName} failed:`, err.message);
+        
+        // If it's a 404/not-found, we try next.
+        // For 429 (Quota), we try next too, though likely all will fail.
+        // The key is to NOT throw, so we eventually hit the fallback.
+        if (isModelNotFoundError(err) || err.status === 429 || err.message.includes('429')) {
+          continue;
+        }
+        
+        // For other unexpected errors, try next model as well
         continue;
       }
-      throw err;
     }
+
+    if (lastError) {
+      console.warn('[Gemini] All models failed. Last error:', lastError.message);
+    }
+  } catch (initErr) {
+    console.warn('[Gemini] AI Client initialization failed:', initErr.message);
   }
 
-  console.warn('[Gemini] All configured models failed. Using local fallback extractor for continuity.');
-  if (lastError) {
-    console.warn(`[Gemini] Last model error: ${lastError.message}`);
-  }
-
+  console.warn('[Gemini] Falling back to local rule-based extractor for reliability.');
   return localFallbackExtraction(rawText);
 };
+

@@ -2,12 +2,21 @@
 import smtplib
 from pathlib import Path
 from email.message import EmailMessage
-from twilio.rest import Client
+
+try:
+    from twilio.rest import Client
+except ImportError:
+    Client = None
+
 from app.core.config import settings
 
 def send_whatsapp_alert(guardian_number: str, message_body: str):
     """Sends a WhatsApp alert to the guardian."""
     if not guardian_number:
+        return
+
+    if Client is None:
+        print("[Twilio] twilio package not installed; skipping WhatsApp dispatch.")
         return
 
     if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
