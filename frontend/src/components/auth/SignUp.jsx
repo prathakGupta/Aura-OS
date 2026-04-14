@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
-import { createUserProfile } from "../../services/authApi";
 
 const SignUp = ({ onComplete }) => {
-  const { signUp, signInWithGoogle, signIn } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -14,81 +13,35 @@ const SignUp = ({ onComplete }) => {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
+    e.preventDefault();
+    setError("");
 
-  if (password !== confirmPassword) {
-    setError("Your passwords don't match. Please try again.");
-    return;
-  }
-
-  if (password.length < 8) {
-    setError("Please use at least 8 characters for your password.");
-    return;
-  }
-
-  setLoading(true);
-  try {
-    let firebaseUser;
-    let token;
-
-    try {
-      // Try creating a new Firebase account
-      const result = await signUp(email, password);
-      firebaseUser = result.user;
-      token = await firebaseUser.getIdToken(true);
-    } catch (firebaseErr) {
-      if (firebaseErr.code === "auth/email-already-in-use") {
-        // Firebase has the account but MongoDB might not
-        // Sign them in silently and try to create the profile
-        try {
-          const result = await signIn(email, password);
-          firebaseUser = result.user;
-          token = await firebaseUser.getIdToken(true);
-        } catch (signInErr) {
-          setError("An account with this email already exists. Try signing in instead.");
-          setLoading(false);
-          return;
-        }
-      } else {
-        throw firebaseErr;
-      }
+    if (password !== confirmPassword) {
+      setError("Your passwords don't match. Please try again.");
+      return;
     }
 
-    // Create MongoDB profile — safe to call even if it already exists
-    await createUserProfile(token, {
-      fullName,
-      authProvider: "email",
-    });
+    if (password.length < 8) {
+      setError("Please use at least 8 characters for your password.");
+      return;
+    }
 
-    onComplete({ token, fullName, email, firebaseUser });
-  } catch (err) {
-    setError("Something went wrong. Please try again in a moment.");
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const handleGoogle = async () => {
-    setError("");
     setLoading(true);
     try {
-      const result = await signInWithGoogle();
-      const token = await result.user.getIdToken();
-      await createUserProfile(token, {
-        fullName: result.user.displayName || "",
-        authProvider: "google",
-      });
-      onComplete({
-        token,
-        fullName: result.user.displayName || "",
-        email: result.user.email,
-        firebaseUser: result.user,
-      });
+      const data = await signUp(fullName, email, password);
+      onComplete({ token: data.token, fullName: data.profile.fullName, email: data.profile.email });
     } catch (err) {
-      setError("Google sign up failed. Please try again.");
+      setError(err.message || "Something went wrong. Please try again in a moment.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      await signInWithGoogle();
+    } catch(err) {
+       // feature unsupported, caught by authContext
     }
   };
 

@@ -1,4 +1,4 @@
-import admin from "../config/firebase.js";
+import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 const verifyToken = async (req, res, next) => {
@@ -14,11 +14,10 @@ const verifyToken = async (req, res, next) => {
 
     const token = authHeader.split("Bearer ")[1];
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findOne({ firebaseUid: decodedToken.uid });
+    const user = await User.findById(decodedToken.id);
 
-    req.firebaseUser = decodedToken;
     req.user = user || null;
 
     next();

@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import { createUserProfile } from "../../services/authApi";
 import ForgotPassword from "./ForgotPassword";
 
 const SignIn = () => {
-  const { signIn, signInWithGoogle, user } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -20,40 +19,21 @@ const SignIn = () => {
     setError("");
     setLoading(true);
     try {
-      const result = await signIn(email, password);
-      const token = await result.user.getIdToken();
-      await handlePostAuth(token, result.user);
+      await signIn(email, password);
+      navigate("/app");
     } catch (err) {
-      setError("We couldn't sign you in with those details. Please check your email and password.");
+      setError(err.message || "We couldn't sign you in with those details. Please check your email and password.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
-    setError("");
-    setLoading(true);
     try {
-      const result = await signInWithGoogle();
-      const token = await result.user.getIdToken();
-      await handlePostAuth(token, result.user, "google");
-    } catch (err) {
-      setError("Google sign in failed. Please try again.");
-    } finally {
-      setLoading(false);
+      await signInWithGoogle();
+    } catch(err) {
+       // feature unsupported, caught by authContext
     }
-  };
-
-  const handlePostAuth = async (token, firebaseUser, provider = "email") => {
-    try {
-      await createUserProfile(token, {
-        fullName: firebaseUser.displayName || "",
-        authProvider: provider,
-      });
-    } catch (err) {
-      // Profile may already exist, continue
-    }
-    navigate("/app");
   };
 
   if (showForgot) {

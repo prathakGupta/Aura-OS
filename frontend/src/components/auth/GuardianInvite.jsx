@@ -1,16 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { verifyInviteToken, completeGuardianSetup } from "../../services/authApi";
-import { auth } from "../../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 
 const GuardianInvite = () => {
   const { token } = useParams();
   const navigate = useNavigate();
 
   const [step, setStep] = useState("verifying"); 
-  // verifying → verified → setup → complete → error
-
   const [guardianInfo, setGuardianInfo] = useState(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -18,7 +14,6 @@ const GuardianInvite = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Verify token on mount
   useEffect(() => {
     const verify = async () => {
       try {
@@ -48,26 +43,14 @@ const GuardianInvite = () => {
 
     setLoading(true);
     try {
-      // Create Firebase account for guardian
-      const result = await createUserWithEmailAndPassword(
-        auth,
-        guardianInfo.email,
-        password
-      );
-
-      // Complete guardian setup in MongoDB
-      await completeGuardianSetup({
+      const data = await completeGuardianSetup({
         token,
-        firebaseUid: result.user.uid,
+        password: password
       });
-
+      localStorage.setItem("token", data.token);
       setStep("complete");
     } catch (err) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("An account with this email already exists. Please sign in instead.");
-      } else {
-        setError("Something went wrong. Please try again in a moment.");
-      }
+      setError("Something went wrong. Please try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -191,10 +174,10 @@ const GuardianInvite = () => {
             </div>
             <button
               className="auth-btn-primary"
-              onClick={() => navigate("/auth")}
+              onClick={() => { window.location.href = "/app" }}
               style={{ marginTop: "8px" }}
             >
-              Go to sign in
+              Go to portal
             </button>
           </div>
         )}

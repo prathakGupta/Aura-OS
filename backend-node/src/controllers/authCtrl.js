@@ -1,6 +1,5 @@
 import User from "../models/User.js";
 import Guardian from "../models/Guardian.js";
-import admin from "../config/firebase.js";
 import {
   generateInviteToken,
   sendGuardianInviteEmail,
@@ -9,6 +8,76 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
+};
+
+// POST /api/auth/register
+export const register = async (req, res) => {
+  try {
+    const { fullName, email, password, authProvider } = req.body;
+
+    const userExists = await User.findOne({ email: email.toLowerCase() });
+    if (userExists) {
+      return res.status(400).json({ success: false, message: "User already exists" });
+    }
+
+    const user = await User.create({
+      fullName,
+      email: email.toLowerCase(),
+      password,
+      authProvider: authProvider || "email",
+      role: "user",
+      onboardingComplete: false,
+    });
+
+    res.status(201).json({
+      success: true,
+      profile: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        onboardingComplete: user.onboardingComplete,
+      },
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error("Register error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// POST /api/auth/login
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
+
+    if (user && (await user.matchPassword(password))) {
+      res.json({
+        success: true,
+        profile: {
+          _id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          role: user.role,
+          onboardingComplete: user.onboardingComplete,
+        },
+        token: generateToken(user._id),
+      });
+    } else {
+      res.status(401).json({ success: false, message: "Invalid email or password" });
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 // GET /api/auth/me
 export const getMe = async (req, res) => {
@@ -22,10 +91,9 @@ export const getMe = async (req, res) => {
 
     let linkedUserId = null;
 
-    // If this is a guardian, find the user they are linked to
     if (req.user.role === "guardian") {
       const guardianRecord = await Guardian.findOne({
-        firebaseUid: req.firebaseUser.uid,
+        email: req.user.email,
       });
       if (guardianRecord) {
         linkedUserId = guardianRecord.linkedUserId.toString();
@@ -41,45 +109,6 @@ export const getMe = async (req, res) => {
     });
   } catch (err) {
     console.error("getMe error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-};
-
-// POST /api/auth/profile
-export const createProfile = async (req, res) => {
-  try {
-    const { fullName, authProvider } = req.body;
-    const { uid, email } = req.firebaseUser;
-
-    // Use findOneAndUpdate with upsert — atomic, never duplicates
-    const user = await User.findOneAndUpdate(
-      { firebaseUid: uid },
-      {
-        $setOnInsert: {
-          firebaseUid: uid,
-          email,
-          fullName,
-          authProvider: authProvider || "email",
-          role: "user",
-          onboardingComplete: false,
-        },
-      },
-      {
-        upsert: true,
-        new: true,
-        runValidators: true,
-      }
-    );
-
-    return res.status(200).json({
-      success: true,
-      profile: user,
-    });
-  } catch (err) {
-    console.error("createProfile error:", err);
     return res.status(500).json({
       success: false,
       message: "Server error",
@@ -187,7 +216,7 @@ export const verifyInvite = async (req, res) => {
 // POST /api/auth/invite/complete
 export const completeGuardianSetup = async (req, res) => {
   try {
-    const { token, firebaseUid } = req.body;
+    const { token, password } = req.body;
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const guardian = await Guardian.findOne({
@@ -212,26 +241,29 @@ export const completeGuardianSetup = async (req, res) => {
 
     await Guardian.findByIdAndUpdate(guardian._id, {
       inviteAccepted: true,
-      firebaseUid,
       inviteToken: null,
       inviteTokenExpiry: null,
     });
 
-    const existingUser = await User.findOne({ firebaseUid });
+    const existingUser = await User.findOne({ email: guardian.email });
+    let authUser;
     if (!existingUser) {
-      await User.create({
-        firebaseUid,
+      authUser = await User.create({
         email: guardian.email,
+        password: password,
         fullName: guardian.fullName,
         role: "guardian",
         onboardingComplete: true,
         authProvider: "email",
       });
+    } else {
+      authUser = existingUser;
     }
 
     return res.status(200).json({
       success: true,
       message: "Guardian account setup complete",
+      token: generateToken(authUser._id.toString())
     });
   } catch (err) {
     console.error("completeGuardianSetup error:", err);
@@ -254,10 +286,6 @@ export const updateProfile = async (req, res) => {
       { new: true }
     );
 
-    await admin.auth().updateUser(req.firebaseUser.uid, {
-      displayName: fullName,
-    });
-
     return res.status(200).json({
       success: true,
       profile: updated,
@@ -275,34 +303,16 @@ export const updateProfile = async (req, res) => {
 export const deleteAccount = async (req, res) => {
   try {
     const userId = req.user._id;
-    const firebaseUid = req.firebaseUser.uid;
 
-    // Find guardian record linked to this user
     const guardian = await Guardian.findOne({ linkedUserId: userId });
 
-    // If guardian has accepted invite, delete their Firebase account too
-    if (guardian && guardian.firebaseUid) {
-      try {
-        await admin.auth().deleteUser(guardian.firebaseUid);
-      } catch (err) {
-        console.error("Guardian Firebase delete failed:", err.message);
-        // Non-fatal — continue with rest of deletion
-      }
+    if (guardian && guardian.email) {
+      await User.findOneAndDelete({ email: guardian.email });
     }
 
-    // Find and delete guardian's User document in MongoDB
-    if (guardian && guardian.firebaseUid) {
-      await User.findOneAndDelete({ firebaseUid: guardian.firebaseUid });
-    }
-
-    // Delete the guardian record itself
     await Guardian.findOneAndDelete({ linkedUserId: userId });
 
-    // Delete the main user
     await User.findByIdAndDelete(userId);
-
-    // Delete main user Firebase account
-    await admin.auth().deleteUser(firebaseUid);
 
     return res.status(200).json({
       success: true,
