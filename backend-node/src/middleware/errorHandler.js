@@ -19,17 +19,17 @@ export const asyncHandler = (fn) => (req, res, next) => {
 
 // Must be registered LAST in server.js (after all routes).
 // Express identifies it as an error handler via the 4-argument signature.
-// eslint-disable-next-line no-unused-vars
+ 
 export const globalErrorHandler = (err, req, res, next) => {
   const status = err.statusCode || 500;
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = process.env.NODE_ENV === "development";
 
   console.error(`[ERROR] ${req.method} ${req.path} → ${status}: ${err.message}`);
   if (isDev) console.error(err.stack);
 
   res.status(status).json({
     success: false,
-    error: err.message || 'Internal server error',
+    error: err.message || "Internal server error",
     // Only expose stack trace locally – never in production
     ...(isDev && { stack: err.stack }),
   });

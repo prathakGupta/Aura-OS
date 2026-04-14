@@ -6,9 +6,9 @@
 //   GET  /api/state/:userId    → Get full user state (dashboard data)
 //   DELETE /api/state/:userId  → Wipe user data (GDPR / reset)
 
-import { v4 as uuidv4 } from 'uuid';
-import UserState from '../models/UserState.js';
-import { AppError } from '../middleware/errorHandler.js';
+import { v4 as uuidv4 } from "uuid";
+import UserState from "../models/UserState.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 // ── POST /api/state/init ─────────────────────────────────────────────────────
 //
@@ -21,7 +21,7 @@ export const initSessionHandler = async (req, res) => {
   const { userId: providedId } = req.body;
 
   // Generate a new userId if none provided
-  const userId = providedId && typeof providedId === 'string'
+  const userId = providedId && typeof providedId === "string"
     ? providedId.trim()
     : uuidv4();
 
@@ -45,7 +45,7 @@ export const getStateHandler = async (req, res) => {
   const { userId } = req.params;
 
   if (!userId) {
-    throw new AppError('userId is required.', 400);
+    throw new AppError("userId is required.", 400);
   }
 
   const user = await UserState.findOne({ userId }).lean();
@@ -59,14 +59,14 @@ export const getStateHandler = async (req, res) => {
   }
 
   const worriesDestroyed = (user.vaultedWorries || []).filter(
-    (w) => w.status === 'destroyed'
+    (w) => w.status === "destroyed"
   ).length;
 
   const tasksCompleted = (user.taskHistory || []).filter(
-    (t) => t.status === 'completed'
+    (t) => t.status === "completed"
   ).length;
 
-  const activeTask = (user.taskHistory || []).find((t) => t.status === 'active');
+  const activeTask = (user.taskHistory || []).find((t) => t.status === "active");
   const activeTaskProgress = activeTask
     ? (Number(activeTask.totalQuests) > 0
       ? Math.round((Number(activeTask.questsCompleted || 0) / Number(activeTask.totalQuests)) * 100)
@@ -102,14 +102,14 @@ export const wipeStateHandler = async (req, res) => {
   const { userId } = req.params;
 
   if (!userId) {
-    throw new AppError('userId is required.', 400);
+    throw new AppError("userId is required.", 400);
   }
 
   await UserState.deleteOne({ userId });
 
   res.json({
     success: true,
-    message: 'User state wiped. Fresh start.',
+    message: "User state wiped. Fresh start.",
   });
 };
 
@@ -123,19 +123,19 @@ export const patchIntakeHandler = async (req, res) => {
   const { userId } = req.params;
   const { baselineArousalScore } = req.body;
 
-  if (!userId) throw new AppError('userId is required.', 400);
+  if (!userId) throw new AppError("userId is required.", 400);
 
   const score = Number(baselineArousalScore);
   if (!Number.isFinite(score) || score < 1 || score > 10) {
-    throw new AppError('baselineArousalScore must be a number between 1 and 10.', 400);
+    throw new AppError("baselineArousalScore must be a number between 1 and 10.", 400);
   }
 
   await UserState.findOneAndUpdate(
     { userId },
     {
       $set: {
-        'clinicalTelemetry.baselineArousalScore': score,
-        'clinicalTelemetry.baselineArousalSetAt': new Date(),
+        "clinicalTelemetry.baselineArousalScore": score,
+        "clinicalTelemetry.baselineArousalSetAt": new Date(),
       },
     },
     { upsert: true, new: true }

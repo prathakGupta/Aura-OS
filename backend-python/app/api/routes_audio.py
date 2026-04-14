@@ -33,6 +33,9 @@ async def ws_audio(websocket: WebSocket):
         while True:
             message = await websocket.receive()
 
+            if message.get("type") == "websocket.disconnect":
+                break
+
             raw_chunk = message.get("bytes")
             if raw_chunk is not None:
                 for outbound in session.process_chunk(raw_chunk):

@@ -709,12 +709,8 @@ export default function TaskShatter() {
   const allDocked = fragments.length > 0 && activeFreeFrags.length === 0;
 
   const canvasBg = {
-    background: '#020915',
-    backgroundImage: `
-      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,60,110,0.55) 0%, transparent 55%),
-      radial-gradient(ellipse 50% 50% at 10% 80%, rgba(124,58,237,0.07) 0%, transparent 55%),
-      radial-gradient(ellipse 50% 50% at 90% 75%, rgba(0,191,165,0.05) 0%, transparent 55%)
-    `,
+    background: 'var(--bg-root)',
+    transition: 'background 0.5s ease',
   };
   const dotGrid = { position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(rgba(0,229,255,0.08) 1px, transparent 1px)', backgroundSize: '36px 36px', opacity: 0.25 };
 
@@ -724,39 +720,36 @@ export default function TaskShatter() {
       <div style={{ ...dotGrid }} />
       <motion.div initial={{ opacity: 0, y: 30, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 160, damping: 18 }}
         style={{ width: '100%', maxWidth: 560, padding: '0 22px', position: 'relative', zIndex: 1 }}>
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <motion.div animate={{ scale: [1, 1.08, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 56, height: 56, borderRadius: '50%', marginBottom: 18,
-              background: 'conic-gradient(from 180deg,#7c3aed,#00e5ff,#00bfa5,#7c3aed)',
-              boxShadow: '0 0 28px rgba(0,229,255,0.35),0 0 60px rgba(124,58,237,0.2)',
-            }}>
-            <Zap size={24} color="white" />
-          </motion.div>
-          <h1 className="title-font" style={{ fontSize: 'clamp(26px,5vw,36px)', fontWeight: 800, letterSpacing: '-0.045em', color: '#e8f4fb', lineHeight: 1.15, marginBottom: 10 }}>
-            What's{' '}
-            <span style={{ background: 'linear-gradient(135deg,#00e5ff,#c4b5fd)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              stopping you?
-            </span>
-          </h1>
-          <p style={{ fontSize: 14.5, color: '#8bafc2', lineHeight: 1.65 }}>
-            Describe the task that's paralysing you. Aura's Coach will break it into 2-minute steps tailored to how you feel right now.
-          </p>
-        </div>
+        <div className="aura-card" style={{ textAlign: 'center' }}>
+          <div style={{ marginBottom: 28 }}>
+            <motion.div animate={{ scale: [1, 1.08, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 56, height: 56, borderRadius: '50%', marginBottom: 18,
+                background: 'conic-gradient(from 180deg,#7c3aed,#00e5ff,#00bfa5,#7c3aed)',
+                boxShadow: '0 0 28px rgba(0,229,255,0.35),0 0 60px rgba(124,58,237,0.2)',
+              }}>
+              <Zap size={24} color="white" />
+            </motion.div>
+            <h1 className="aura-heading-gradient" style={{ fontSize: 'clamp(26px,5vw,36px)', fontWeight: 800, letterSpacing: '-0.045em', lineHeight: 1.15, marginBottom: 10 }}>
+              What's{' '}
+              <span style={{ background: 'linear-gradient(135deg,#00e5ff,#c4b5fd)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                stopping you?
+              </span>
+            </h1>
+            <p style={{ fontSize: 14.5, color: 'var(--text-2)', lineHeight: 1.65 }}>
+              Describe the task that's paralysing you. Aura's Coach will break it into 2-minute steps tailored to how you feel right now.
+            </p>
+          </div>
 
-        <div style={{ position: 'relative', marginBottom: 16 }}>
+        <div style={{ position: 'relative', marginBottom: 20 }}>
           <textarea value={taskText} onChange={(e) => setTaskText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleShowCoach(); }}
             rows={4} placeholder="e.g. Build the backend for my project..."
+            className="aura-input-unified"
             style={{
-              width: '100%', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(0,229,255,0.2)',
-              borderRadius: 18, padding: '18px 22px', color: '#e8f4fb', fontFamily: 'inherit',
-              fontSize: 15.5, lineHeight: 1.7, resize: 'none', outline: 'none',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)', transition: 'border-color 0.2s, box-shadow 0.2s',
+              height: 'auto', padding: '18px 22px', lineHeight: 1.7, resize: 'none',
             }}
-            onFocus={(e) => { e.target.style.borderColor = 'rgba(0,229,255,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(0,229,255,0.1)'; }}
-            onBlur={(e) => { e.target.style.borderColor = 'rgba(0,229,255,0.2)'; e.target.style.boxShadow = 'none'; }}
           />
           <div style={{ position: 'absolute', bottom: 13, right: 16, fontSize: 11, color: 'rgba(139,175,194,0.4)', fontWeight: 500 }}>⌘↵</div>
         </div>
@@ -775,6 +768,7 @@ export default function TaskShatter() {
           <Brain size={18} /> Talk to Aura Coach <ArrowRight size={16} />
         </motion.button>
         {error && <p style={{ marginTop: 14, fontSize: 13, color: '#ffb3c1', textAlign: 'center' }}>{error}</p>}
+        </div>
       </motion.div>
     </div>
   );
@@ -785,11 +779,11 @@ export default function TaskShatter() {
       <div style={{ ...dotGrid }} />
       <motion.div initial={{ opacity: 0, scale: 0.93, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 220, damping: 22 }}
         style={{ width: '100%', maxWidth: 500, padding: '0 22px', position: 'relative', zIndex: 1 }}>
-        <div className="glass" style={{ borderRadius: 28, padding: '34px 30px' }}>
+        <div className="aura-card" style={{ padding: '34px 30px' }}>
           {/* Task preview */}
           <div style={{ background: 'rgba(0,229,255,0.04)', border: '1px solid rgba(0,229,255,0.12)', borderRadius: 14, padding: '12px 16px', marginBottom: 24 }}>
             <p style={{ fontSize: 10.5, color: '#00e5ff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>Breaking down</p>
-            <p style={{ fontSize: 14, color: '#e8f4fb', fontWeight: 600, lineHeight: 1.4 }}>
+            <p style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 600, lineHeight: 1.4 }}>
               {taskText.length > 60 ? taskText.slice(0, 60) + '…' : taskText}
             </p>
           </div>
@@ -1056,10 +1050,11 @@ export default function TaskShatter() {
         <div style={{ ...dotGrid }} />
 
         {/* Top bar */}
-        <div className="glass" style={{
+        <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 22px',
-          borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderRadius: 0,
+          background: 'rgba(2,9,21,0.9)', backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}>
           <span className="badge badge-cyan"><Zap size={10} /> Shattered Canvas</span>
           <p style={{ fontSize: 12, color: '#4a6275', fontWeight: 500, textAlign: 'center', flex: 1, margin: '0 16px' }}>

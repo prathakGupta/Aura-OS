@@ -2,19 +2,19 @@
 // Zustand global store — single flat store for hackathon pace.
 // Extended with userProfile for mental-health personalization.
 
-import { create } from 'zustand';
-import { stateApi } from '../services/api.js';
+import { create } from "zustand";
+import { stateApi } from "../services/api.js";
 
 // ── Safely load persisted profile from localStorage ──────────
 // Runs once at module init; errors silently so a corrupted
 // localStorage entry never crashes the whole app.
 const loadPersistedProfile = () => {
   try {
-    const raw = localStorage.getItem('aura-profile');
+    const raw = localStorage.getItem("aura-profile");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     // Validate shape — must have at least profileId and primaryTab
-    if (parsed && typeof parsed.profileId === 'string' && typeof parsed.primaryTab === 'string') {
+    if (parsed && typeof parsed.profileId === "string" && typeof parsed.primaryTab === "string") {
       return parsed;
     }
     return null;
@@ -29,16 +29,16 @@ const useStore = create((set, get) => ({
   isInitialized: false,
 
   initSession: async () => {
-    const stored = localStorage.getItem('aura-userId') || undefined;
+    const stored = localStorage.getItem("aura-userId") || undefined;
     try {
       const data = await stateApi.init(stored);
-      localStorage.setItem('aura-userId', data.userId);
+      localStorage.setItem("aura-userId", data.userId);
       set({ userId: data.userId, isInitialized: true });
       return data;
     } catch {
       // If backend is down during demo, fall back gracefully
       const fallbackId = stored || `local-${Date.now()}`;
-      localStorage.setItem('aura-userId', fallbackId);
+      localStorage.setItem("aura-userId", fallbackId);
       set({ userId: fallbackId, isInitialized: true });
     }
   },
@@ -50,7 +50,7 @@ const useStore = create((set, get) => ({
 
   setUserProfile: (profile) => {
     try {
-      localStorage.setItem('aura-profile', JSON.stringify(profile));
+      localStorage.setItem("aura-profile", JSON.stringify(profile));
     } catch {
       // localStorage unavailable (private browsing, storage full, etc.) — non-fatal
     }
@@ -59,7 +59,7 @@ const useStore = create((set, get) => ({
 
   clearUserProfile: () => {
     try {
-      localStorage.removeItem('aura-profile');
+      localStorage.removeItem("aura-profile");
     } catch { /* non-fatal */ }
     set({ userProfile: null });
   },
@@ -84,7 +84,7 @@ const useStore = create((set, get) => ({
   },
 
   // ── Navigation ─────────────────────────────────────────────
-  activeTab: 'forge',   // 'voice' | 'forge' | 'shatter'
+  activeTab: "forge",   // 'voice' | 'forge' | 'shatter'
   setTab: (tab) => set({ activeTab: tab }),
 
   // ── Cognitive Forge state ──────────────────────────────────
@@ -97,7 +97,7 @@ const useStore = create((set, get) => ({
   markWorryDestroyed: (uuid) =>
     set((s) => ({
       worries: s.worries.map((w) =>
-        w.uuid === uuid ? { ...w, status: 'destroyed' } : w
+        w.uuid === uuid ? { ...w, status: "destroyed" } : w
       ),
     })),
   setExtracting: (v) => set({ isExtracting: v }),
@@ -135,7 +135,7 @@ const useStore = create((set, get) => ({
       baselineProfile:     s.baselineProfile,
       lastKnownActivity:   s.lastKnownActivity,
       worryBlocks:         s.worries.map(w => ({
-        id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active',
+        id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || "active",
       })),
       probeSessions:       s.probeSessions.map(p => ({
         imageId: p.imageId, firstSeen: p.firstSeen, latencyMs: p.latencyMs,
@@ -200,9 +200,9 @@ const useStore = create((set, get) => ({
 
   // ── Aura Voice state ────────────────────────────────────────
   isListening:    false,
-  auraEmotion:    'calm',   // 'calm' | 'mild_anxiety' | 'high_anxiety'
-  auraTranscript: '',
-  auraResponse:   '',
+  auraEmotion:    "calm",   // 'calm' | 'mild_anxiety' | 'high_anxiety'
+  auraTranscript: "",
+  auraResponse:   "",
   audioMuted:     false,
   isAuraSpeaking: false,
 

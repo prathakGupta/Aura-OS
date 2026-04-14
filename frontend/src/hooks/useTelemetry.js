@@ -3,9 +3,9 @@
 // Catches vocal stress events forwarded from Aura Voice and mouse kinetics
 // from the Shattered Canvas (erratic drag = stress signal).
 
-import { useRef, useCallback } from 'react';
-import useStore from '../store/useStore.js';
-import { clinicalApi } from '../services/portalApi.js';
+import { useRef, useCallback } from "react";
+import useStore from "../store/useStore.js";
+import { clinicalApi } from "../services/portalApi.js";
 
 export default function useTelemetry() {
   const { userId, auraEmotion } = useStore();
@@ -21,9 +21,9 @@ export default function useTelemetry() {
     lastLoggedRef.current = now;
 
     try {
-      await fetch('/api/clinical/vocal-stress', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/clinical/vocal-stress", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ userId, emotion, arousalScore, taskContext }),
       });
     } catch { /* non-critical, silent */ }

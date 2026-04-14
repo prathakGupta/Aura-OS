@@ -2,8 +2,8 @@
 // Factory functions for Matter.js physics bodies used in Cognitive Forge.
 // v2.0 — Per-word splitting + heavier physics + brutalist styling
 
-import Matter from 'matter-js';
-import { weightToWidth, weightToColor } from './engine.js';
+import Matter from "matter-js";
+import { weightToWidth, weightToColor } from "./engine.js";
 
 const { Bodies, World } = Matter;
 
@@ -39,7 +39,7 @@ export const spawnWordBlock = (world, word, uuid, weight, canvasW, spawnX) => {
     frictionAir: 0.03,
     density: 0.004,          // heavier blocks
     render: {
-      fillStyle: '#1a1a2e',  // brutalist dark fill
+      fillStyle: "#1a1a2e",  // brutalist dark fill
       strokeStyle: color,
       lineWidth: 2.5,        // thick aggressive border
     },
@@ -66,7 +66,7 @@ export const spawnWordBlock = (world, word, uuid, weight, canvasW, spawnX) => {
  * @param {number} canvasW
  */
 export const spawnWorryBlock = (world, worry, canvasW) => {
-  const words = (worry.worry || '').trim().split(/\s+/).filter(Boolean);
+  const words = (worry.worry || "").trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return;
 
   const spacing = Math.min(120, (canvasW - 160) / words.length);
@@ -101,7 +101,7 @@ export const spawnAllWorries = (world, worries, canvasW, delayMs = 400) => {
  */
 export const clearAllBlocks = (world) => {
   const toRemove = world.bodies.filter(
-    (b) => b.label !== 'wall' && b.label !== 'fireplace' && b.label !== 'shelf'
+    (b) => b.label !== "wall" && b.label !== "fireplace" && b.label !== "shelf"
   );
   World.remove(world, toRemove);
 };

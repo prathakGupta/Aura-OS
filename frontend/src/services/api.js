@@ -4,7 +4,7 @@
 // • AbortController: prevents ghost fetches after component unmount
 // • All functions throw Error with the server's human-readable message
 
-const BASE        = '/api';       // Vite proxy → http://localhost:5001
+const BASE        = "/api";       // Vite proxy → http://localhost:5001
 const AI_TIMEOUT  = 25_000;       // 25s — Gemini/Groq cold-start allowance
 const API_TIMEOUT = 8_000;        // 8s  — DB + health endpoints
 
@@ -25,7 +25,7 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   try {
     const res = await fetch(`${BASE}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
@@ -36,8 +36,8 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
     }
     return json;
   } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error('Request timed out. The AI is busy — please try again.');
+    if (err.name === "AbortError") {
+      throw new Error("Request timed out. The AI is busy — please try again.");
     }
     throw err;
   } finally {
@@ -45,39 +45,39 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
   }
 };
 
-const get    = (path)       => req('GET',    path);
-const post   = (path, body) => req('POST',   path, body);
-const postAI = (path, body) => req('POST',   path, body, AI_TIMEOUT);
-const del    = (path)       => req('DELETE', path);
+const get    = (path)       => req("GET",    path);
+const post   = (path, body) => req("POST",   path, body);
+const postAI = (path, body) => req("POST",   path, body, AI_TIMEOUT);
+const del    = (path)       => req("DELETE", path);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 export const stateApi = {
-  init:        (userId)                       => post('/state/init', { userId }),
+  init:        (userId)                       => post("/state/init", { userId }),
   get:         (userId)                       => get(`/state/${userId}`),
   wipe:        (userId)                       => del(`/state/${userId}`),
   // Persists baselineArousalScore (1-10) to clinicalTelemetry in MongoDB.
   // Called fire-and-forget from App.jsx after intake completes.
   patchIntake: (userId, baselineArousalScore) =>
-    req('PATCH', `/state/${userId}/intake`, { baselineArousalScore }),
+    req("PATCH", `/state/${userId}/intake`, { baselineArousalScore }),
 };
 
 // ── Cognitive Forge ───────────────────────────────────────────────────────────
 export const forgeApi = {
-  extract:       (text, userId)                   => postAI('/forge/extract', { text, userId }),
-  destroy:       (userId, worryId)                => post('/forge/destroy', { userId, worryId }),
+  extract:       (text, userId)                   => postAI("/forge/extract", { text, userId }),
+  destroy:       (userId, worryId)                => post("/forge/destroy", { userId, worryId }),
   vault:         (userId, worryId, worry, weight) =>
-                   post('/forge/vault', { userId, worryId, worry, weight }),
+                   post("/forge/vault", { userId, worryId, worry, weight }),
   getVault:      (userId)                         => get(`/forge/vault/${userId}`),
   deleteVaulted: (userId, worryId)                => del(`/forge/vault/${userId}/${worryId}`),
 };
 
 // ── Task Shatterer ────────────────────────────────────────────────────────────
 export const shatterApi = {
-  coachBreakdown: (task, blocker, userId)          => postAI('/shatter/breakdown', { task, userId, blocker }),
-  breakdown:      (task, userId)                   => postAI('/shatter/breakdown', { task, userId }),
-  syncTimeline:   (userId, taskId, timeline)       => post('/shatter/sync-timeline', { userId, taskId, timeline }),
-  complete:       (userId, taskId, questId)        => post('/shatter/complete', { userId, taskId, questId }),
-  abandon:        (userId, taskId)                 => post('/shatter/abandon', { userId, taskId }),
+  coachBreakdown: (task, blocker, userId)          => postAI("/shatter/breakdown", { task, userId, blocker }),
+  breakdown:      (task, userId)                   => postAI("/shatter/breakdown", { task, userId }),
+  syncTimeline:   (userId, taskId, timeline)       => post("/shatter/sync-timeline", { userId, taskId, timeline }),
+  complete:       (userId, taskId, questId)        => post("/shatter/complete", { userId, taskId, questId }),
+  abandon:        (userId, taskId)                 => post("/shatter/abandon", { userId, taskId }),
   getActive:      (userId)                         => get(`/shatter/active/${userId}`),
   getHistory:     (userId)                         => get(`/shatter/history/${userId}`),
 };
@@ -85,10 +85,10 @@ export const shatterApi = {
 // ── Python RAG Backend ────────────────────────────────────────────────────────
 export const pythonApi = {
   ragProtocol: (condition, severity, arousal_score, userId) =>
-    postAI('/v1/rag/recovery-protocol', { condition, severity, arousal_score, user_id: userId }),
+    postAI("/v1/rag/recovery-protocol", { condition, severity, arousal_score, user_id: userId }),
 };
 
 // ── Clinical API ──────────────────────────────────────────────────────────────
 export const clinicalApi = {
-  generateRecoveryProtocol: (userId, reportData) => postAI('/clinical/recovery-protocol', { userId, reportData }),
+  generateRecoveryProtocol: (userId, reportData) => postAI("/clinical/recovery-protocol", { userId, reportData }),
 };

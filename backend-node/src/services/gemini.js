@@ -1,27 +1,23 @@
-// src/services/gemini.js (Unified AI Engine)
-// Consolidated Groq and OpenRouter integration with bulletproof headers.
+// open router
+// src/services/forgeExtractor.js (OpenRouter Engine)
 
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 let aiClient = null;
 
 const getClient = () => {
   if (!aiClient) {
-    // Priority 1: Groq, Priority 2: OpenRouter
-    const apiKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY; // Or DEEPSEEK_API_KEY
     if (!apiKey) {
-      throw new Error('API_KEY (GROQ or OPENROUTER) is not set in environment variables.');
+      throw new Error("API_KEY is not set in environment variables.");
     }
-
     aiClient = new OpenAI({
-      baseURL: process.env.GROQ_API_KEY 
-        ? 'https://api.groq.com/openai/v1' 
-        : 'https://openrouter.ai/api/v1',
+      baseURL: "https://openrouter.ai/api/v1",
       apiKey: apiKey,
       defaultHeaders: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'http://localhost:5173', 
-        'X-Title': 'AuraOS', 
+        "Authorization": `Bearer ${apiKey}`, // <-- THE BULLETPROOF FIX
+        "HTTP-Referer": "http://localhost:5173", 
+        "X-Title": "AuraOS", 
       },
     });
   }
@@ -42,33 +38,20 @@ RULES - follow these exactly:
 const localFallbackExtraction = (rawText) => {
   const segments = rawText.split(/[,.!?;\n]+/).map((s) => s.trim()).filter(Boolean);
   const worries = segments.slice(0, 6).map((segment, idx) => {
-    const short = segment.split(/\s+/).slice(0, 8).join(' ');
+    const short = segment.split(/\s+/).slice(0, 8).join(" ");
     const hasStressWords = /(can't|cannot|worried|anxious|stress|deadline|rent|money|health|afraid|panic)/i.test(segment);
-    return { id: idx + 1, worry: short || 'general worry', weight: hasStressWords ? 7 : 5 };
+    return { id: idx + 1, worry: short || "general worry", weight: hasStressWords ? 7 : 5 };
   });
-  return worries.length ? worries : [{ id: 1, worry: 'general overwhelm', weight: 5 }];
+  return worries.length ? worries : [{ id: 1, worry: "general overwhelm", weight: 5 }];
 };
 
-/**
- * Extracts worries from text using the configured AI engine (Groq or OpenRouter).
- */
 export const extractWorries = async (rawText) => {
   if (!rawText || rawText.trim().length < 3) return [];
 
-  let client;
-  try {
-    client = getClient();
-  } catch (err) {
-    console.error(`[ForgeExtractor] Client init failed: ${err.message}`);
-    console.warn('[ForgeExtractor] Falling back to local extractor.');
-    return localFallbackExtraction(rawText);
-  }
+  const client = getClient();
+  const modelName = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
 
-  const modelName = process.env.GROQ_API_KEY 
-    ? (process.env.GROQ_MODEL || 'llama-3.1-8b-instant')
-    : (process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini');
-
-  console.log(`[ForgeExtractor] Extracting worries using ${modelName}...`);
+  console.log(`[OpenRouter] Extracting worries using ${modelName}...`);
 
   try {
     const response = await client.chat.completions.create({
@@ -78,15 +61,16 @@ export const extractWorries = async (rawText) => {
         { role: "user", content: rawText }
       ],
       temperature: 0.2,
-      response_format: { type: 'json_object' } 
+      // OpenRouter passes this down to models that support JSON mode
+      response_format: { type: "json_object" } 
     });
 
     const parsed = JSON.parse(response.choices.message.content);
     return parsed.worries || [];
 
   } catch (err) {
-    console.error(`[ForgeExtractor] Extraction failed: ${err.message}`);
-    console.warn('[ForgeExtractor] Falling back to local extractor.');
+    console.error(`[OpenRouter] Extraction failed: ${err.message}`);
+    console.warn("[OpenRouter] Falling back to local extractor.");
     return localFallbackExtraction(rawText);
   }
 };

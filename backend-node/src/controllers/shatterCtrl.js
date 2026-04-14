@@ -1,18 +1,18 @@
 // src/controllers/shatterCtrl.js  🌟 UPDATED — accepts blocker, logs telemetry
-import { v4 as uuidv4 } from 'uuid';
-import { breakdownTask, coachBreakdown } from '../services/langchain.js';
-import UserState from '../models/UserState.js';
-import { AppError } from '../middleware/errorHandler.js';
+import { v4 as uuidv4 } from "uuid";
+import { breakdownTask, coachBreakdown } from "../services/langchain.js";
+import UserState from "../models/UserState.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 // ── POST /api/shatter/breakdown ──────────────────────────────────────────────
 // Accepts optional `blocker` field. If present, uses the Coach AI persona.
 export const breakdownTaskHandler = async (req, res) => {
   const { task, userId, blocker } = req.body;
 
-  if (!task || typeof task !== 'string' || task.trim().length < 3)
-    throw new AppError('Please describe the task you want to break down.', 400);
+  if (!task || typeof task !== "string" || task.trim().length < 3)
+    throw new AppError("Please describe the task you want to break down.", 400);
   if (task.trim().length > 500)
-    throw new AppError('Task description too long (max 500 chars).', 400);
+    throw new AppError("Task description too long (max 500 chars).", 400);
 
   let microquests, coachMessage, envStrategy;
 
@@ -41,7 +41,7 @@ export const breakdownTaskHandler = async (req, res) => {
     coachMessage:coachMessage || null,
     envStrategy: envStrategy || null,
     microquests,
-    status:      'active',
+    status:      "active",
     questsCompleted: 0,
     totalQuests: microquests.length,
     createdAt:   new Date(),
@@ -50,11 +50,11 @@ export const breakdownTaskHandler = async (req, res) => {
   if (userId) {
     try {
       const user = await UserState.findOrCreate(userId);
-      user.taskHistory.forEach(t => { if (t.status === 'active') t.status = 'abandoned'; });
+      user.taskHistory.forEach(t => { if (t.status === "active") t.status = "abandoned"; });
       user.taskHistory.push(taskRecord);
       await user.save();
     } catch (dbErr) {
-      console.warn('[ShatterCtrl] DB save failed (non-fatal):', dbErr.message);
+      console.warn("[ShatterCtrl] DB save failed (non-fatal):", dbErr.message);
     }
   }
 
@@ -75,74 +75,66 @@ export const breakdownTaskHandler = async (req, res) => {
 export const completeQuestHandler = async (req, res) => {
   const { userId, taskId, questId } = req.body;
   if (!userId || !taskId || questId === undefined)
-    throw new AppError('userId, taskId, and questId are required.', 400);
-  const normalizedQuestId = Number(questId);
-  if (!Number.isInteger(normalizedQuestId) || normalizedQuestId < 1) {
-    throw new AppError('questId must be a positive integer.', 400);
-  }
+    throw new AppError("userId, taskId, and questId are required.", 400);
 
   const user = await UserState.findOne({ userId });
-  if (!user) throw new AppError('User not found.', 404);
+  if (!user) throw new AppError("User not found.", 404);
 
   const task = user.taskHistory.find(t => t.id === taskId);
-  if (!task) throw new AppError('Task not found.', 404);
+  if (!task) throw new AppError("Task not found.", 404);
 
-  const quest = task.microquests.find(q => Number(q.id) === normalizedQuestId);
-  if (!quest) throw new AppError(`Quest ${normalizedQuestId} not found.`, 404);
-  if (quest.completed) throw new AppError('Quest already completed.', 409);
+  const quest = task.microquests.find(q => q.id === questId);
+  if (!quest) throw new AppError(`Quest ${questId} not found.`, 404);
+  if (quest.completed) throw new AppError("Quest already completed.", 409);
 
   quest.completed  = true;
   quest.completedAt= new Date();
   task.questsCompleted = task.microquests.filter(q => q.completed).length;
 
   const allDone = task.questsCompleted === task.totalQuests;
-  if (allDone) { task.status = 'completed'; task.completedAt = new Date(); }
+  if (allDone) { task.status = "completed"; task.completedAt = new Date(); }
 
   // 🌟 Log executive function event
   user.ensureClinicalTelemetry?.();
   user.clinicalTelemetry.executiveFunction.push({
     taskId,
     taskSummary: task.originalTask.slice(0, 100),
-    status:      'completed',
+    status:      "completed",
     blocker:     task.blocker,
   });
 
   await user.save();
 
   const nextQuest = task.microquests.find(q => !q.completed) || null;
-  const progress = task.totalQuests > 0
-    ? Math.round((task.questsCompleted / task.totalQuests) * 100)
-    : 0;
-
   res.json({
     success:         true,
-    questId: normalizedQuestId,
+    questId,
     taskComplete:    allDone,
     questsCompleted: task.questsCompleted,
     totalQuests:     task.totalQuests,
-    progress,
+    progress:        Math.round((task.questsCompleted / task.totalQuests) * 100),
     nextQuest,
-    message:         allDone ? '🎉 Task fully shattered!' : `Quest ${normalizedQuestId} done.`,
+    message:         allDone ? "🎉 Task fully shattered!" : `Quest ${questId} done.`,
   });
 };
 
 // ── POST /api/shatter/abandon ────────────────────────────────────────────────
 export const abandonTaskHandler = async (req, res) => {
   const { userId, taskId } = req.body;
-  if (!userId || !taskId) throw new AppError('userId and taskId are required.', 400);
+  if (!userId || !taskId) throw new AppError("userId and taskId are required.", 400);
 
   const user = await UserState.findOne({ userId });
   if (!user) return res.json({ success: true });
 
   const task = user.taskHistory.find(t => t.id === taskId);
-  if (task && task.status === 'active') {
-    task.status = 'abandoned';
+  if (task && task.status === "active") {
+    task.status = "abandoned";
     // 🌟 Log executive function abandonment
     user.ensureClinicalTelemetry?.();
     user.clinicalTelemetry.executiveFunction.push({
       taskId,
       taskSummary: task.originalTask.slice(0, 100),
-      status:      'abandoned',
+      status:      "abandoned",
       blocker:     task.blocker,
     });
     await user.save();
@@ -156,7 +148,7 @@ export const getActiveTaskHandler = async (req, res) => {
   const { userId } = req.params;
   const user = await UserState.findOne({ userId }).lean();
   if (!user) return res.json({ success: true, activeTask: null });
-  const activeTask = user.taskHistory.find(t => t.status === 'active') || null;
+  const activeTask = user.taskHistory.find(t => t.status === "active") || null;
   res.json({ success: true, activeTask, currentQuest: activeTask?.microquests?.find(q => !q.completed) || null });
 };
 
@@ -165,8 +157,8 @@ export const getTaskHistoryHandler = async (req, res) => {
   const { userId } = req.params;
   const user = await UserState.findOne({ userId }).lean();
   if (!user) return res.json({ success: true, history: [], completedCount: 0 });
-  const history = (user.taskHistory || []).filter(t => t.status !== 'active').sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0,20);
-  res.json({ success: true, completedCount: history.filter(t=>t.status==='completed').length, history });
+  const history = (user.taskHistory || []).filter(t => t.status !== "active").sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0,20);
+  res.json({ success: true, completedCount: history.filter(t=>t.status==="completed").length, history });
 };
 
 // ── POST /api/shatter/sync-timeline ─────────────────────────────────────────
@@ -175,17 +167,17 @@ export const syncTimelineHandler = async (req, res) => {
   const { userId, taskId, timeline } = req.body;
 
   if (!userId || !taskId) {
-    throw new AppError('userId and taskId are required.', 400);
+    throw new AppError("userId and taskId are required.", 400);
   }
   if (!Array.isArray(timeline) || timeline.length === 0) {
-    throw new AppError('timeline must be a non-empty array.', 400);
+    throw new AppError("timeline must be a non-empty array.", 400);
   }
 
   const user = await UserState.findOne({ userId });
-  if (!user) throw new AppError('User not found.', 404);
+  if (!user) throw new AppError("User not found.", 404);
 
   const task = user.taskHistory.find((t) => t.id === taskId);
-  if (!task) throw new AppError('Task not found.', 404);
+  if (!task) throw new AppError("Task not found.", 404);
 
   const existingById = new Map(
     (task.microquests || []).map((q) => [String(q.id), q])
@@ -196,8 +188,8 @@ export const syncTimelineHandler = async (req, res) => {
       const existing = existingById.get(String(q.id)) || null;
       return {
         id: idx + 1,
-        action: String(q.action || q.text || '').trim().slice(0, 300),
-        tip: String(q.tip || existing?.tip || '').trim().slice(0, 300),
+        action: String(q.action || q.text || "").trim().slice(0, 300),
+        tip: String(q.tip || existing?.tip || "").trim().slice(0, 300),
         duration_minutes: Math.min(10, Math.max(1, Number(q.duration_minutes || existing?.duration_minutes || 2))),
         completed: Boolean(existing?.completed),
         completedAt: existing?.completed ? existing.completedAt || new Date() : null,
@@ -206,7 +198,7 @@ export const syncTimelineHandler = async (req, res) => {
     .filter((q) => q.action.length > 0);
 
   if (!normalized.length) {
-    throw new AppError('timeline does not contain valid quest actions.', 400);
+    throw new AppError("timeline does not contain valid quest actions.", 400);
   }
 
   task.microquests = normalized;

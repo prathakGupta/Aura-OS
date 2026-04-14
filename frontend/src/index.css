@@ -67,8 +67,36 @@
   --r-lg: 22px;
   --r-xl: 32px;
 
+  --bg-void:    #020617;
   --ease:   cubic-bezier(0.4,0,0.2,1);
   --spring: cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ── Light Mode Overrides ────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-root:       #f8fafc;
+  --bg-surface:    #ffffff;
+  --bg-void:       #f1f5f9;
+  --bg-glass:      rgba(15, 23, 42, 0.03);
+  --bg-glass-h:    rgba(15, 23, 42, 0.06);
+  --bg-glass-deep: rgba(255,255,255,0.9);
+  
+  --border:   rgba(15, 23, 42, 0.08);
+  --border-h: rgba(15, 23, 42, 0.12);
+
+  --text-1: #020617;
+  --text-2: #1e293b;
+  --text-3: #475569;
+
+  --text-primary:   #020617;
+  --text-secondary: #1e293b;
+  --text-muted:     #475569;
+
+  --purple:      #6d28d9;
+  --cyan:        #0e7490;
+  --teal:        #0f766e;
+  --purple-glow: rgba(109, 40, 217, 0.1);
+  --cyan-glow:   rgba(14, 116, 144, 0.1);
 }
 
 /* ── Reset ─────────────────────────────────────────────────── */
@@ -88,12 +116,20 @@ body {
   font-family: var(--font);
   background: var(--bg-root);
   /* Vibrant but calm aurora backdrop */
-  background-image:
-    radial-gradient(ellipse 120% 60% at 50%   0%,  rgba(0,60,110,0.85)  0%, transparent 65%),
-    radial-gradient(ellipse 50%  60% at 10%  80%,  rgba(124,58,237,0.12) 0%, transparent 65%),
-    radial-gradient(ellipse 50%  60% at 90%  75%,  rgba(0,190,165,0.08)  0%, transparent 65%),
-    radial-gradient(ellipse 40%  40% at 50%  100%, rgba(0,229,255,0.06)  0%, transparent 60%);
+  background-image: 
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(0,60,110,0.85) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 60% at 10% 80%, rgba(124,58,237,0.12) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 60% at 90% 75%, rgba(0,190,165,0.08) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 40% at 50% 100%, rgba(0,229,255,0.06) 0%, transparent 60%);
   color: var(--text-1);
+  transition: background 0.5s ease, color 0.3s ease;
+}
+
+[data-theme="light"] body {
+  background-image: 
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(203,213,225,0.4) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 10% 80%, rgba(124,58,237,0.05) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 60% at 90% 75%, rgba(0,190,165,0.03) 0%, transparent 65%);
 }
 
 button  { cursor: pointer; border: none; background: none; font-family: inherit; }
@@ -145,6 +181,57 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08); /* 3D pop */
 }
 
+/* ── Unified Components (Aura DS) ────────────────────────── */
+
+/* The primary high-tech container */
+.aura-card {
+  background: var(--bg-glass-deep);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 32px;
+  box-shadow: 
+    0 10px 40px -10px rgba(0,0,0,0.5),
+    inset 0 1px 0 0 rgba(255,255,255,0.05);
+  transition: transform 0.3s var(--ease), border-color 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+.aura-card:hover {
+  border-color: var(--border-h);
+  box-shadow: 
+    0 20px 50px -12px rgba(0,0,0,0.6),
+    inset 0 1px 0 0 rgba(255,255,255,0.08);
+}
+
+/* Standard Interactive Inputs */
+.aura-input-unified {
+  width: 100%;
+  height: 52px;
+  padding: 0 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-1);
+  font-family: var(--font);
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s var(--ease);
+}
+.aura-input-unified::placeholder { color: var(--text-3); opacity: 0.6; }
+.aura-input-unified:focus {
+  border-color: var(--purple-soft);
+  background: rgba(124,58,237,0.08);
+  box-shadow: 0 0 0 4px var(--purple-glow);
+}
+
+/* Heading Gradients */
+.aura-heading-gradient {
+  background: linear-gradient(135deg, var(--text-1), var(--text-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: var(--font-heading);
+}
+
 /* ── Top nav ───────────────────────────────────────────────── */
 .topnav {
   display:flex; align-items:center; justify-content:space-between;
@@ -152,8 +239,9 @@ a { color: inherit; text-decoration: none; }
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(32px) saturate(160%);
   -webkit-backdrop-filter: blur(32px);
-  background: rgba(2,9,21,0.88);
+  background: var(--bg-glass-deep);
   position:sticky; top:0; z-index:100;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 .topnav-logo {
   display:flex; align-items:center; gap:10px;
@@ -312,6 +400,12 @@ a { color: inherit; text-decoration: none; }
 .btn-secondary:hover { background: var(--bg-glass-h); color: var(--text-1); border-color: var(--border-h); }
 .btn-ghost  { color: var(--text-3); padding: 8px 14px; font-size: 13px; font-weight: 600; }
 .btn-ghost:hover { color: var(--text-2); }
+.btn-danger {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+.btn-danger:hover { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); }
 .btn:disabled { opacity: 0.38; cursor: not-allowed; transform: none !important; filter: none !important; }
 
 /* ── Spinner ───────────────────────────────────────────────── */
@@ -451,7 +545,7 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0D0B14;
+  background: var(--bg-root);
   position: relative;
   overflow: hidden;
   padding: 24px;
@@ -492,15 +586,20 @@ a { color: inherit; text-decoration: none; }
 .auth-card {
   width: 100%;
   max-width: 448px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 24px;
   padding: 40px;
   backdrop-filter: blur(20px);
-  box-shadow: 0 0 40px rgba(0, 201, 255, 0.06);
+  box-shadow: 0 0 40px rgba(0, 201, 255, 0.04);
   position: relative;
   z-index: 10;
   animation: cardFadeIn 0.4s ease forwards;
+}
+
+[data-theme="dark"] .auth-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 @keyframes cardFadeIn {
@@ -524,7 +623,7 @@ a { color: inherit; text-decoration: none; }
 .auth-logo-text {
   font-size: 18px;
   font-weight: 600;
-  color: #F0ECFF;
+  color: var(--text-1);
   letter-spacing: 0.5px;
 }
 
@@ -544,7 +643,7 @@ a { color: inherit; text-decoration: none; }
   border: none;
   border-radius: 9px;
   background: transparent;
-  color: #8B82A7;
+  color: var(--text-3);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -552,12 +651,12 @@ a { color: inherit; text-decoration: none; }
 }
 
 .auth-tab.active {
-  background: rgba(0, 201, 255, 0.12);
-  color: #00C9FF;
+  background: var(--cyan-glow);
+  color: var(--cyan);
 }
 
 .auth-tab:hover:not(.active) {
-  color: #C4BDD4;
+  color: var(--text-2);
 }
 
 /* Form */
@@ -573,15 +672,16 @@ a { color: inherit; text-decoration: none; }
 }
 
 .auth-heading h1 {
-  font-size: 22px;
-  font-weight: 600;
-  color: #F0ECFF;
-  margin: 0 0 6px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.02em;
 }
 
 .auth-heading p {
   font-size: 14px;
-  color: #8B82A7;
+  color: var(--text-2);
   margin: 0;
   line-height: 1.5;
 }
@@ -622,17 +722,17 @@ a { color: inherit; text-decoration: none; }
 
 .auth-field label {
   font-size: 13px;
-  font-weight: 500;
-  color: #C4BDD4;
+  font-weight: 600;
+  color: var(--text-2);
 }
 
 .auth-field input {
   height: 48px;
   padding: 0 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  color: #F0ECFF;
+  color: var(--text-1);
   font-size: 14px;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -641,12 +741,13 @@ a { color: inherit; text-decoration: none; }
 }
 
 .auth-field input::placeholder {
-  color: #4A4360;
+  color: var(--text-3);
+  opacity: 0.5;
 }
 
 .auth-field input:focus {
-  border-color: #00C9FF;
-  box-shadow: 0 0 0 3px rgba(0, 201, 255, 0.1);
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-glow);
 }
 
 /* Field row (label + forgot) */
@@ -909,7 +1010,7 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0D0B14;
+  background: var(--bg-root);
   position: relative;
   overflow: hidden;
   padding: 24px;

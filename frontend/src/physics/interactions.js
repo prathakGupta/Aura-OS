@@ -3,7 +3,7 @@
 // grab and drag worry blocks with their mouse/touch.
 // v2.0 — Snappier grab feel + thicker drag line for visibility
 
-import Matter from 'matter-js';
+import Matter from "matter-js";
 
 const { Mouse, MouseConstraint, World } = Matter;
 
@@ -31,7 +31,7 @@ export const addMouseInteraction = (engine, render, canvas) => {
         // Show a thick visible spring line when dragging
         visible: true,
         lineWidth: 2.5,
-        strokeStyle: 'rgba(255,107,138,0.65)', // coral drag line
+        strokeStyle: "rgba(255,107,138,0.65)", // coral drag line
       },
     },
   });
@@ -39,7 +39,7 @@ export const addMouseInteraction = (engine, render, canvas) => {
   World.add(engine.world, mouseConstraint);
 
   // Prevent canvas mouse events from scrolling the page
-  canvas.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+  canvas.addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
 
   return mouseConstraint;
 };

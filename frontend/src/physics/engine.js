@@ -2,8 +2,8 @@
 // Initialises the Matter.js world for the Cognitive Forge canvas.
 // v2.0 — Shelf staging area + confetti destruction + brutalist text rendering
 
-import Matter from 'matter-js';
-import confetti from 'canvas-confetti';
+import Matter from "matter-js";
+import confetti from "canvas-confetti";
 
 const { Engine, Render, Runner, World, Bodies, Events } = Matter;
 
@@ -11,9 +11,9 @@ const { Engine, Render, Runner, World, Bodies, Events } = Matter;
 export const weightToWidth  = (w) => 90 + w * 18;
 // Brutalist dark fills — heavy and aggressive
 export const weightToColor  = (w) => {
-  if (w >= 8) return '#dc2626';   // red – high urgency
-  if (w >= 5) return '#d97706';   // amber – medium
-  return '#6d28d9';               // purple – lower
+  if (w >= 8) return "#dc2626";   // red – high urgency
+  if (w >= 5) return "#d97706";   // amber – medium
+  return "#6d28d9";               // purple – lower
 };
 
 /**
@@ -38,14 +38,14 @@ export const initEngine = (canvas, onBlockDestroyed) => {
     options: {
       width: W,
       height: H,
-      background: 'transparent',
+      background: "transparent",
       wireframes: false,
       pixelRatio: window.devicePixelRatio || 1,
     },
   });
 
   // ── Static walls ───────────────────────────────────────────────────────────
-  const wallOpts = { isStatic: true, render: { fillStyle: 'transparent' }, label: 'wall' };
+  const wallOpts = { isStatic: true, render: { fillStyle: "transparent" }, label: "wall" };
   World.add(world, [
     Bodies.rectangle(W / 2, H + 25, W, 50, wallOpts),  // floor (hidden, below canvas)
     Bodies.rectangle(-25,   H / 2, 50, H, wallOpts),   // left wall
@@ -58,10 +58,10 @@ export const initEngine = (canvas, onBlockDestroyed) => {
   const shelfW = W - 100;
   const shelf = Bodies.rectangle(W / 2, shelfY, shelfW, 10, {
     isStatic: true,
-    label: 'shelf',
+    label: "shelf",
     render: {
-      fillStyle: 'rgba(255,255,255,0.08)',
-      strokeStyle: 'rgba(255,255,255,0.18)',
+      fillStyle: "rgba(255,255,255,0.08)",
+      strokeStyle: "rgba(255,255,255,0.18)",
       lineWidth: 1,
     },
   });
@@ -72,19 +72,19 @@ export const initEngine = (canvas, onBlockDestroyed) => {
   const fireplace = Bodies.rectangle(W / 2, H - 14, W - 80, 36, {
     isStatic: true,
     isSensor: true,
-    label: 'fireplace',
-    render: { fillStyle: 'transparent', strokeStyle: 'transparent' },
+    label: "fireplace",
+    render: { fillStyle: "transparent", strokeStyle: "transparent" },
   });
   World.add(world, fireplace);
 
   // ── Collision: block enters fireplace → confetti + destroy ─────────────────
-  Events.on(engine, 'collisionStart', ({ pairs }) => {
+  Events.on(engine, "collisionStart", ({ pairs }) => {
     pairs.forEach(({ bodyA, bodyB }) => {
       const block =
-        bodyA.label === 'fireplace' ? bodyB :
-        bodyB.label === 'fireplace' ? bodyA : null;
+        bodyA.label === "fireplace" ? bodyB :
+        bodyB.label === "fireplace" ? bodyA : null;
 
-      if (block && block.label !== 'fireplace' && block.label !== 'wall' && block.label !== 'shelf') {
+      if (block && block.label !== "fireplace" && block.label !== "wall" && block.label !== "shelf") {
         // Explosion confetti at the block's position
         const canvasRect = canvas.getBoundingClientRect();
         const bx = (canvasRect.left + block.position.x) / window.innerWidth;
@@ -93,7 +93,7 @@ export const initEngine = (canvas, onBlockDestroyed) => {
           particleCount: 25,
           spread: 60,
           origin: { x: Math.min(1, Math.max(0, bx)), y: Math.min(1, Math.max(0, by)) },
-          colors: ['#ff6b8a', '#ffb300', '#c4b5fd', '#00e676'],
+          colors: ["#ff6b8a", "#ffb300", "#c4b5fd", "#00e676"],
           ticks: 50,
           gravity: 1.2,
           scalar: 0.8,
@@ -107,19 +107,19 @@ export const initEngine = (canvas, onBlockDestroyed) => {
   });
 
   // ── Custom render: draw worry text on each block (BRUTALIST style) ─────────
-  Events.on(render, 'afterRender', () => {
+  Events.on(render, "afterRender", () => {
     const ctx = render.context;
 
     // Draw shelf label
     ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.font = '600 9px Inter, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('▼ DRAG BLOCKS DOWN TO INCINERATE ▼', W / 2, shelfY + 22);
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.font = "600 9px Inter, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("▼ DRAG BLOCKS DOWN TO INCINERATE ▼", W / 2, shelfY + 22);
     ctx.restore();
 
     world.bodies.forEach((body) => {
-      if (body.label === 'wall' || body.label === 'fireplace' || body.label === 'shelf' || !body.worryText) return;
+      if (body.label === "wall" || body.label === "fireplace" || body.label === "shelf" || !body.worryText) return;
 
       ctx.save();
       ctx.translate(body.position.x, body.position.y);
@@ -129,17 +129,17 @@ export const initEngine = (canvas, onBlockDestroyed) => {
       const text = body.worryText.toUpperCase();
       const maxWidth = body.worryWidth - 16;
 
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.font = '900 13px Inter, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.font = "900 13px Inter, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
 
       // Simple line-break: if text too long, split roughly in half
       if (ctx.measureText(text).width > maxWidth) {
-        const words = text.split(' ');
+        const words = text.split(" ");
         const mid = Math.ceil(words.length / 2);
-        const line1 = words.slice(0, mid).join(' ');
-        const line2 = words.slice(mid).join(' ');
+        const line1 = words.slice(0, mid).join(" ");
+        const line2 = words.slice(mid).join(" ");
         ctx.fillText(line1, 0, -8);
         ctx.fillText(line2, 0, 8);
       } else {

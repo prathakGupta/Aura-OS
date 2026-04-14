@@ -70,3 +70,5 @@ backend-python/training/checkpoints/
 
 # Large ML Model files (Excluded due to GitHub limits on large clones/forks)
 backend-python/models/wav2vec2_emotion.pt
+
+/backend-node/src/config/serviceAccountKey.json

@@ -47,21 +47,21 @@ function ProfileBadge({ profile, onReset }) {
   if (!p) return null;
   return (
     <motion.button
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, x: 10 }}
+      animate={{ opacity: 1, x: 0 }}
       onClick={onReset}
-      title={`Your profile: ${p.label} (${profile.severity}). Click to retake.`}
+      title={`Your profile: ${p.label}. Click to retake.`}
+      className="glass"
       style={{
-        display: 'flex', alignItems: 'center', gap: 7,
+        display: 'flex', alignItems: 'center', gap: 8,
         padding: '5px 12px', borderRadius: 999,
-        background: p.bg, border: `1px solid ${p.border}`,
-        cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+        background: `${p.bg}12`, border: `1px solid ${p.border}30`,
+        cursor: 'pointer', height: 36,
       }}>
-      <span style={{ fontSize: 15, lineHeight: 1 }}>{p.emoji}</span>
-      {/* Label hidden on small screens via CSS class */}
+      <span style={{ fontSize: 14 }}>{p.emoji}</span>
       <span
         className="nav-tab-label"
-        style={{ fontSize: 11, fontWeight: 700, color: p.color, letterSpacing: '-0.01em' }}>
+        style={{ fontSize: 11, fontWeight: 700, color: p.color, letterSpacing: '0.01em' }}>
         {p.label}
       </span>
     </motion.button>
@@ -85,7 +85,10 @@ export default function App() {
 
   const [initError,    setInitError]    = useState(false);
   const [resumeBanner, setResumeBanner] = useState(null);
-  const [isDark,       setIsDark]       = useState(true);
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('aura-theme');
+    return saved !== null ? saved === 'dark' : true;
+  });
   const [showLanding,  setShowLanding]  = useState(!isPortalView);
   const [showIntake,   setShowIntake]   = useState(false);
 
@@ -96,6 +99,8 @@ export default function App() {
   /* ── Theme ── */
   useEffect(() => {
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('aura-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
   /* ── Session init ── */

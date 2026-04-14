@@ -8,31 +8,31 @@
 //  4. Receive JSON messages from Python: transcript | response | emotion_update
 //  5. Receive TTS audio (base64) → decode → play back
 
-import { useRef, useCallback, useEffect } from 'react';
-import useStore from '../store/useStore.js';
+import { useRef, useCallback, useEffect } from "react";
+import useStore from "../store/useStore.js";
 
-const isBrowser = typeof window !== 'undefined';
+const isBrowser = typeof window !== "undefined";
 
-const toWsProtocol = (protocol) => (protocol === 'https:' ? 'wss:' : 'ws:');
+const toWsProtocol = (protocol) => (protocol === "https:" ? "wss:" : "ws:");
 
 const resolveWsUrl = (userId) => {
   if (!isBrowser) return null;
 
   // Optional override for production: VITE_AUDIO_WS_URL=ws://host:8000/ws/audio
-  const fromEnv = (import.meta.env.VITE_AUDIO_WS_URL || '').trim();
+  const fromEnv = (import.meta.env.VITE_AUDIO_WS_URL || "").trim();
   if (fromEnv) {
-    const joiner = fromEnv.includes('?') ? '&' : '?';
-    return `${fromEnv}${joiner}userId=${encodeURIComponent(userId || '')}`;
+    const joiner = fromEnv.includes("?") ? "&" : "?";
+    return `${fromEnv}${joiner}userId=${encodeURIComponent(userId || "")}`;
   }
 
   // In local dev, connect directly to Python to avoid Vite WS proxy churn.
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `ws://localhost:8000/ws/audio?userId=${encodeURIComponent(userId || '')}`;
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return `ws://localhost:8000/ws/audio?userId=${encodeURIComponent(userId || "")}`;
   }
 
   // Default path for production/reverse-proxy.
   const wsProtocol = toWsProtocol(window.location.protocol);
-  return `${wsProtocol}//${window.location.host}/ws/audio?userId=${encodeURIComponent(userId || '')}`;
+  return `${wsProtocol}//${window.location.host}/ws/audio?userId=${encodeURIComponent(userId || "")}`;
 };
 
 const BUFFER_SIZE = 4096;
@@ -86,7 +86,7 @@ export default function useAudioStream() {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
 
-      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
         audioCtxRef.current.close().catch(() => {});
       }
 
@@ -128,7 +128,7 @@ export default function useAudioStream() {
   const drawVisualizer = useCallback((canvas, analyser) => {
     if (!canvas || !analyser) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const bufferLength = analyser.frequencyBinCount;
@@ -161,7 +161,7 @@ export default function useAudioStream() {
         ctx.globalAlpha = 0.7 + value * 0.3;
 
         ctx.beginPath();
-        if (typeof ctx.roundRect === 'function') {
+        if (typeof ctx.roundRect === "function") {
           ctx.roundRect(x, y, barWidth, barHeight, 3);
         } else {
           const radius = Math.min(3, barWidth / 2, barHeight / 2);
@@ -197,11 +197,11 @@ export default function useAudioStream() {
       try {
         const wsUrl = resolveWsUrl(userId);
         if (!isBrowser || !wsUrl) {
-          throw new Error('Audio stream can only start in a browser environment.');
+          throw new Error("Audio stream can only start in a browser environment.");
         }
 
         if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error('Microphone access is not supported in this browser.');
+          throw new Error("Microphone access is not supported in this browser.");
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -209,7 +209,7 @@ export default function useAudioStream() {
 
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         if (!AudioContextClass) {
-          throw new Error('Web Audio API is not supported in this browser.');
+          throw new Error("Web Audio API is not supported in this browser.");
         }
 
         const audioCtx = new AudioContextClass({ sampleRate: SAMPLE_RATE });
@@ -239,10 +239,10 @@ export default function useAudioStream() {
         // ── WebSocket connection ──────────────────────────────────────────────
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
-        ws.binaryType = 'arraybuffer';
+        ws.binaryType = "arraybuffer";
 
         ws.onopen = () => {
-          console.log('[WS] Connected to Python audio backend');
+          console.log("[WS] Connected to Python audio backend");
           setListening(true);
         };
 
@@ -251,15 +251,15 @@ export default function useAudioStream() {
             const msg = JSON.parse(event.data);
 
             switch (msg.type) {
-              case 'transcript':
-                setAuraTranscript(msg.text || '');
+              case "transcript":
+                setAuraTranscript(msg.text || "");
                 break;
 
-              case 'response':
-                setAuraResponse(msg.text || '');
+              case "response":
+                setAuraResponse(msg.text || "");
                 if (msg.emotion) setAuraEmotion(msg.emotion);
 
-                if (typeof msg.tts_audio === 'string' && msg.tts_audio && audioCtxRef.current && !audioMutedRef.current) {
+                if (typeof msg.tts_audio === "string" && msg.tts_audio && audioCtxRef.current && !audioMutedRef.current) {
                   try {
                     if (ttsSourceRef.current) {
                       try { ttsSourceRef.current.stop(0); } catch (_) {}
@@ -287,32 +287,32 @@ export default function useAudioStream() {
                     ttsSource.start();
                   } catch (e) {
                     setAuraSpeaking(false);
-                    console.warn('[WS] TTS playback failed:', e?.message || e);
+                    console.warn("[WS] TTS playback failed:", e?.message || e);
                   }
                 }
                 break;
 
-              case 'emotion_update':
-                setAuraEmotion(msg.emotion || '');
+              case "emotion_update":
+                setAuraEmotion(msg.emotion || "");
                 break;
 
               default:
                 break;
             }
           } catch (e) {
-            console.warn('[WS] Invalid message received:', e);
+            console.warn("[WS] Invalid message received:", e);
           }
         };
 
         ws.onerror = () => {
           console.error(
-            '[WS] Could not connect to the voice backend. Is the Python service running on :8000?'
+            "[WS] Could not connect to the voice backend. Is the Python service running on :8000?"
           );
           stop();
         };
 
         ws.onclose = () => {
-          console.log('[WS] Disconnected');
+          console.log("[WS] Disconnected");
           stop();
         };
 
@@ -322,7 +322,7 @@ export default function useAudioStream() {
           ws.send(float32.buffer);
         };
       } catch (err) {
-        console.error('[AudioStream] Failed to start:', err);
+        console.error("[AudioStream] Failed to start:", err);
         stop();
         throw err;
       }

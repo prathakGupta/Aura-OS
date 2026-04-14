@@ -33,7 +33,7 @@ export const sendGuardianInviteEmail = async ({
   const mailOptions = {
     from: process.env.MAIL_FROM,
     to: guardianEmail,
-    subject: `You've been added as a guardian on AuraOS`,
+    subject: "You've been added as a guardian on AuraOS",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0D0B14; color: #F0ECFF; border-radius: 16px;">
         <h2 style="color: #00C9FF; margin-bottom: 8px;">AuraOS</h2>

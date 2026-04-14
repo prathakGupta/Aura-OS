@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 export default function useIdleDetection(timeoutMs = 30000, onIdle) {
   const timeoutRef = useRef(null);
@@ -22,19 +22,19 @@ export default function useIdleDetection(timeoutMs = 30000, onIdle) {
     handleActivity();
 
     // Listeners for user activity
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    window.addEventListener('touchstart', handleActivity);
-    window.addEventListener('scroll', handleActivity);
-    window.addEventListener('click', handleActivity);
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("touchstart", handleActivity);
+    window.addEventListener("scroll", handleActivity);
+    window.addEventListener("click", handleActivity);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-      window.removeEventListener('touchstart', handleActivity);
-      window.removeEventListener('scroll', handleActivity);
-      window.removeEventListener('click', handleActivity);
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("touchstart", handleActivity);
+      window.removeEventListener("scroll", handleActivity);
+      window.removeEventListener("click", handleActivity);
     };
   }, [timeoutMs]);
 }

@@ -5,7 +5,7 @@ import { createUserProfile } from "../../services/authApi";
 import ForgotPassword from "./ForgotPassword";
 
 const SignIn = () => {
-  const { signIn, signInWithGoogle, user } = useAuth();
+  const { signIn, signInWithGoogle, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -14,6 +14,19 @@ const SignIn = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+
+  const getFriendlyError = (code) => {
+    switch (code) {
+      case "auth/user-not-found": return "No account found with this email. Please sign up first.";
+      case "auth/wrong-password": return "Incorrect password. Please try again.";
+      case "auth/invalid-email":   return "Please enter a valid email address.";
+      case "auth/network-request-failed": return "Network error. Check your connection.";
+      case "auth/too-many-requests": return "Too many failed attempts. Try again later.";
+      case "auth/user-disabled": return "This account has been disabled.";
+      case "auth/email-already-in-use": return "An account with this email already exists.";
+      default: return "We couldn't sign you in. Please check your details.";
+    }
+  };
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -24,7 +37,8 @@ const SignIn = () => {
       const token = await result.user.getIdToken();
       await handlePostAuth(token, result.user);
     } catch (err) {
-      setError("We couldn't sign you in with those details. Please check your email and password.");
+      setError(getFriendlyError(err.code));
+      console.error("SignIn Error:", err);
     } finally {
       setLoading(false);
     }
@@ -50,8 +64,11 @@ const SignIn = () => {
         fullName: firebaseUser.displayName || "",
         authProvider: provider,
       });
+      await refreshProfile();
     } catch (err) {
-      // Profile may already exist, continue
+      console.warn("[Auth] Profile sync skipped or failed (might already exist):", err.message);
+      // Try to refresh anyway to see if we have a profile
+      try { await refreshProfile(); } catch (e) { console.error("[Auth] Fatal profile refresh error:", e); }
     }
     navigate("/app");
   };

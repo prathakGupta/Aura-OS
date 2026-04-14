@@ -166,7 +166,7 @@ export default function AuraVoice() {
         width:'min(360px,88vw)', height:'min(360px,88vw)',
         flexShrink:0, marginBottom:36,
         borderRadius:20, overflow:'hidden',
-        background:'radial-gradient(ellipse at 45% 42%, #001e33 0%, #000d1c 42%, #00060f 100%)',
+        background:'radial-gradient(ellipse at 45% 42%, #001e33 0%, #000d1c 42%, var(--bg-void) 100%)',
       }}>
         {/* Layer 1: Static PCB traces */}
         <svg viewBox="0 0 380 380" aria-hidden="true"
@@ -268,7 +268,7 @@ export default function AuraVoice() {
         {/* Layer 11: Center void + mic button */}
         <div style={{
           position:'absolute',inset:'33%',borderRadius:'50%',
-          background:'radial-gradient(circle at 42% 40%, #001929, #00060e)',
+          background:'radial-gradient(circle at 38% 36%, var(--bg-void), #00060e)',
           boxShadow:'inset 0 0 36px rgba(0,0,0,0.97), inset 0 0 14px rgba(0,20,40,0.9)',
           animation:'voidBreathe 4s ease-in-out infinite',
           display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',

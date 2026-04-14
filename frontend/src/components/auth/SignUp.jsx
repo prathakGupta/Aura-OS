@@ -113,6 +113,7 @@ const SignUp = ({ onComplete }) => {
           <label>Full name</label>
           <input
             type="text"
+            className="aura-input-unified"
             placeholder="Your name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -125,6 +126,7 @@ const SignUp = ({ onComplete }) => {
           <label>Email address</label>
           <input
             type="email"
+            className="aura-input-unified"
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -138,6 +140,7 @@ const SignUp = ({ onComplete }) => {
           <div className="auth-input-wrapper">
             <input
               type={showPassword ? "text" : "password"}
+              className="aura-input-unified"
               placeholder="At least 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -158,6 +161,7 @@ const SignUp = ({ onComplete }) => {
           <label>Confirm password</label>
           <input
             type="password"
+            className="aura-input-unified"
             placeholder="Repeat your password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}

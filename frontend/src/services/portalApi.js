@@ -1,5 +1,5 @@
-const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
-const CLINICAL = `${baseUrl}/api/clinical`;
+const BASE_URL = "/api";
+const CLINICAL = `${BASE_URL}/clinical`;
 const AI_TIMEOUT = 30_000;
 const API_TIMEOUT = 8_000;
 

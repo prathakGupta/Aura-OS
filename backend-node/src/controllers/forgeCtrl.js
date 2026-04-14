@@ -8,10 +8,10 @@
 //   GET  /api/forge/vault/:userId → Retrieve vaulted worries
 //   DELETE /api/forge/vault/:userId/:worryId → Remove from vault
 
-import { v4 as uuidv4 } from 'uuid';
-import { extractWorries } from '../services/gemini.js';
-import UserState from '../models/UserState.js';
-import { AppError } from '../middleware/errorHandler.js';
+import { v4 as uuidv4 } from "uuid";
+import { extractWorries } from "../services/gemini.js";
+import UserState from "../models/UserState.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 // ── POST /api/forge/extract ──────────────────────────────────────────────────
 //
@@ -22,8 +22,8 @@ import { AppError } from '../middleware/errorHandler.js';
 export const extractWorriesHandler = async (req, res) => {
   const { text, userId } = req.body;
 
-  if (!text || typeof text !== 'string' || text.trim().length < 5) {
-    throw new AppError('Please provide at least a sentence describing your worries.', 400);
+  if (!text || typeof text !== "string" || text.trim().length < 5) {
+    throw new AppError("Please provide at least a sentence describing your worries.", 400);
   }
 
   // Extract worries via Gemini
@@ -41,7 +41,7 @@ export const extractWorriesHandler = async (req, res) => {
   const taggedWorries = worries.map((w) => ({
     ...w,
     uuid: uuidv4(),  // stable ID for physics body → DB linking
-    status: 'active',
+    status: "active",
   }));
 
   // If userId provided, save the session's active worries to DB
@@ -54,7 +54,7 @@ export const extractWorriesHandler = async (req, res) => {
           id: w.uuid,
           worry: w.worry,
           weight: w.weight,
-          status: 'active',
+          status: "active",
         }))
       );
 
@@ -69,7 +69,7 @@ export const extractWorriesHandler = async (req, res) => {
       await user.save();
     } catch (dbErr) {
       // DB errors are non-fatal here – the AI result is still valid
-      console.warn('[ForgeCtrl] DB save failed (non-fatal):', dbErr.message);
+      console.warn("[ForgeCtrl] DB save failed (non-fatal):", dbErr.message);
     }
   }
 
@@ -90,27 +90,27 @@ export const destroyWorryHandler = async (req, res) => {
   const { userId, worryId } = req.body;
 
   if (!userId || !worryId) {
-    throw new AppError('userId and worryId are required.', 400);
+    throw new AppError("userId and worryId are required.", 400);
   }
 
   const user = await UserState.findOne({ userId });
   if (!user) {
     // Not a hard error – user may not have been persisted (no-auth guest mode)
-    return res.json({ success: true, message: 'Worry destroyed (no record found).' });
+    return res.json({ success: true, message: "Worry destroyed (no record found)." });
   }
 
   const worry = user.vaultedWorries.id(worryId) ||
     user.vaultedWorries.find((w) => w.id === worryId);
 
   if (worry) {
-    worry.status = 'destroyed';
+    worry.status = "destroyed";
     worry.resolvedAt = new Date();
     await user.save();
   }
 
   res.json({
     success: true,
-    message: 'Worry destroyed. Let it go.',
+    message: "Worry destroyed. Let it go.",
     worryId,
   });
 };
@@ -124,7 +124,7 @@ export const vaultWorryHandler = async (req, res) => {
   const { userId, worryId, worry, weight } = req.body;
 
   if (!userId) {
-    throw new AppError('userId is required.', 400);
+    throw new AppError("userId is required.", 400);
   }
 
   const user = await UserState.findOrCreate(userId);
@@ -132,14 +132,14 @@ export const vaultWorryHandler = async (req, res) => {
   // If the worry already exists (from extract step), update it
   const existing = user.vaultedWorries.find((w) => w.id === worryId);
   if (existing) {
-    existing.status = 'vaulted';
+    existing.status = "vaulted";
   } else if (worry) {
     // Fresh vault (user typed a worry directly without extracting)
     user.vaultedWorries.push({
       id: worryId || uuidv4(),
       worry: worry.slice(0, 500),
       weight: Math.min(10, Math.max(1, Number(weight) || 5)),
-      status: 'vaulted',
+      status: "vaulted",
     });
   }
 
@@ -147,7 +147,7 @@ export const vaultWorryHandler = async (req, res) => {
 
   res.json({
     success: true,
-    message: 'Worry saved to your vault.',
+    message: "Worry saved to your vault.",
   });
 };
 
@@ -160,7 +160,7 @@ export const getVaultHandler = async (req, res) => {
   const { userId } = req.params;
 
   if (!userId) {
-    throw new AppError('userId param is required.', 400);
+    throw new AppError("userId param is required.", 400);
   }
 
   const user = await UserState.findOne({ userId }).lean();
@@ -170,7 +170,7 @@ export const getVaultHandler = async (req, res) => {
   }
 
   const vault = (user.vaultedWorries || [])
-    .filter((w) => w.status === 'vaulted')
+    .filter((w) => w.status === "vaulted")
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   res.json({
@@ -187,11 +187,11 @@ export const deleteVaultedWorryHandler = async (req, res) => {
 
   const user = await UserState.findOne({ userId });
   if (!user) {
-    throw new AppError('User not found.', 404);
+    throw new AppError("User not found.", 404);
   }
 
   user.vaultedWorries = user.vaultedWorries.filter((w) => w.id !== worryId);
   await user.save();
 
-  res.json({ success: true, message: 'Removed from vault.' });
+  res.json({ success: true, message: "Removed from vault." });
 };

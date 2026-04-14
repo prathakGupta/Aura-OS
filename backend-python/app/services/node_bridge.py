@@ -23,15 +23,18 @@ async def post_vocal_stress_event(
         "taskContext": task_context,
     }
 
-    timeout = httpx.Timeout(connect=1.0, read=2.0, write=2.0, pool=2.0)
-
+    timeout = httpx.Timeout(connect=2.0, read=4.0, write=4.0, pool=4.0)
+    
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(url, json=payload)
             if response.status_code >= 400:
                 print(
-                    f"[NodeBridge] vocal-stress sync failed with status "
-                    f"{response.status_code}: {response.text[:200]}"
+                    f"[NodeBridge] sync failed ({response.status_code}): {response.text[:100]}"
                 )
+    except httpx.ConnectError:
+        print(f"[NodeBridge] connection refused at {url}. Is the Node backend running?")
+    except httpx.ConnectTimeout:
+        print(f"[NodeBridge] connection timeout at {url}. Network is slow or server is overloaded.")
     except Exception as exc:
-        print(f"[NodeBridge] vocal-stress sync error: {exc!r}")
+        print(f"[NodeBridge] sync error: {exc!r}")

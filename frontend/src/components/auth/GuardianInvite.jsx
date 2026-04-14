@@ -78,7 +78,7 @@ const GuardianInvite = () => {
       <div className="orb orb-cyan" />
       <div className="orb orb-purple" />
 
-      <div className="auth-card">
+      <div className="aura-card">
         {/* Logo */}
         <div className="auth-logo">
           <span className="auth-logo-icon">◎</span>
@@ -89,7 +89,7 @@ const GuardianInvite = () => {
         {step === "verifying" && (
           <div className="auth-form">
             <div className="auth-heading">
-              <h1>Verifying your invite</h1>
+              <h1 className="aura-heading-gradient">Verifying your invite</h1>
               <p>Just a moment while we check your link.</p>
             </div>
             <div className="invite-spinner" />
@@ -136,6 +136,7 @@ const GuardianInvite = () => {
                 <div className="auth-input-wrapper">
                   <input
                     type={showPassword ? "text" : "password"}
+                    className="aura-input-unified"
                     placeholder="At least 8 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -156,6 +157,7 @@ const GuardianInvite = () => {
                 <label>Confirm password</label>
                 <input
                   type="password"
+                  className="aura-input-unified"
                   placeholder="Repeat your password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -180,7 +182,7 @@ const GuardianInvite = () => {
         {step === "complete" && (
           <div className="auth-form">
             <div className="auth-heading">
-              <h1>You're all set</h1>
+              <h1 className="aura-heading-gradient">You're all set</h1>
               <p>Your guardian account has been created successfully.</p>
             </div>
             <div className="auth-success">

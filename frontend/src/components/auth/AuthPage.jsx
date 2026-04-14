@@ -23,7 +23,7 @@ const AuthPage = () => {
       <div className="orb orb-cyan" />
       <div className="orb orb-purple" />
 
-      <div className="auth-card">
+      <div className="aura-card" style={{ width: '100%', maxWidth: 448 }}>
         {/* Logo */}
         <div className="auth-logo">
           <span className="auth-logo-icon">◎</span>

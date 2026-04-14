@@ -2,8 +2,8 @@
 // Mongoose schema — extended with Guardian link + Clinical Telemetry
 // All new clinical fields are ADDITIVE — existing fields untouched.
 
-import mongoose from 'mongoose';
-import { dbReady } from '../config/db.js';
+import mongoose from "mongoose";
+import { dbReady } from "../config/db.js";
 
 /* ── Sub-schemas ───────────────────────────────────────────── */
 
@@ -11,7 +11,7 @@ const WorrySchema = new mongoose.Schema({
   id:        { type: String, required: true },
   worry:     { type: String, required: true, maxlength: 500 },
   weight:    { type: Number, min: 1, max: 10, default: 5 },
-  status:    { type: String, enum: ['active', 'destroyed', 'vaulted'], default: 'active' },
+  status:    { type: String, enum: ["active", "destroyed", "vaulted"], default: "active" },
   createdAt: { type: Date, default: Date.now },
   resolvedAt:{ type: Date, default: null },
 });
@@ -32,7 +32,7 @@ const TaskSchema = new mongoose.Schema({
   coachMessage:    { type: String, maxlength: 600 },           // 🌟 NEW: AI coach message
   envStrategy:     { type: String, maxlength: 50 },            // 🌟 NEW: brown_noise etc.
   microquests:     [MicroQuestSchema],
-  status:          { type: String, enum: ['active', 'completed', 'abandoned'], default: 'active' },
+  status:          { type: String, enum: ["active", "completed", "abandoned"], default: "active" },
   questsCompleted: { type: Number, default: 0 },
   totalQuests:     { type: Number, default: 0 },
   createdAt:       { type: Date, default: Date.now },
@@ -45,8 +45,8 @@ const GuardianSchema = new mongoose.Schema({
   email:             { type: String, maxlength: 200 },
   phone:             { type: String, maxlength: 20 },   // E.164 format: +919876543210
   relation:          { type: String, maxlength: 60 },   // "parent", "therapist", "counselor"
-  alertPreference:   { type: String, enum: ['whatsapp', 'sms', 'email', 'none'], default: 'whatsapp' },
-  reportFrequency:   { type: String, enum: ['instant', 'daily', 'weekly'], default: 'instant' },
+  alertPreference:   { type: String, enum: ["whatsapp", "sms", "email", "none"], default: "whatsapp" },
+  reportFrequency:   { type: String, enum: ["instant", "daily", "weekly"], default: "instant" },
   linkedAt:          { type: Date, default: Date.now },
 }, { _id: false });
 
@@ -54,7 +54,7 @@ const GuardianSchema = new mongoose.Schema({
 
 const VocalStressEventSchema = new mongoose.Schema({
   timestamp:     { type: Date, default: Date.now },
-  emotion:       { type: String, enum: ['calm', 'mild_anxiety', 'high_anxiety'], default: 'calm' },
+  emotion:       { type: String, enum: ["calm", "mild_anxiety", "high_anxiety"], default: "calm" },
   arousalScore:  { type: Number, min: 1, max: 10, default: 5 }, // 1 = calm, 10 = acute distress
   taskContext:   { type: String, maxlength: 200 },               // what was the user doing
 }, { _id: false });
@@ -70,7 +70,7 @@ const ExecutiveFunctionEventSchema = new mongoose.Schema({
   timestamp:     { type: Date, default: Date.now },
   taskId:        { type: String },
   taskSummary:   { type: String, maxlength: 200 },
-  status:        { type: String, enum: ['completed', 'abandoned'], default: 'completed' },
+  status:        { type: String, enum: ["completed", "abandoned"], default: "completed" },
   blocker:       { type: String, maxlength: 200 },
 }, { _id: false });
 
@@ -118,7 +118,7 @@ const UserStateSchema = new mongoose.Schema(
 
 /* ── Middleware & Statics ──────────────────────────────────── */
 
-UserStateSchema.pre('save', function (next) {
+UserStateSchema.pre("save", function (next) {
   this.lastActive = new Date();
   next();
 });
@@ -168,7 +168,7 @@ function _inMemoryFallback(userId) {
 }
 
 UserStateSchema.methods.ensureClinicalTelemetry = function () {
-  if (!this.clinicalTelemetry || typeof this.clinicalTelemetry !== 'object') {
+  if (!this.clinicalTelemetry || typeof this.clinicalTelemetry !== "object") {
     this.clinicalTelemetry = {};
   }
   if (!Array.isArray(this.clinicalTelemetry.vocalStressEvents)) {
@@ -210,5 +210,5 @@ UserStateSchema.methods.logExecFunction = async function ({ taskId, taskSummary,
   return this.save();
 };
 
-const UserState = mongoose.model('UserState', UserStateSchema);
+const UserState = mongoose.model("UserState", UserStateSchema);
 export default UserState;

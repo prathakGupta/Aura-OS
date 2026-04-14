@@ -35,9 +35,10 @@ const IMAGES = [
   },
 ];
 
-export default function PerceptionProbe({ onSessionEnd }) {
+export default function PerceptionProbe({ onSessionEnd, onUpdate }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [firstSeen, setFirstSeen] = useState(null);
+  const [metrics, setMetrics] = useState(null); 
   const switchStartRef = useRef(null); // timer starts when FIRST choice is made
   const gameStartRef = useRef(Date.now());
 
@@ -47,18 +48,22 @@ export default function PerceptionProbe({ onSessionEnd }) {
 
   const logAndAdvance = (session) => {
     addProbeSession(session);
+    const durationSeconds = Math.round((Date.now() - gameStartRef.current) / 1000);
+    const m = {
+      gameId: 'perception_probe',
+      gameName: 'Perspective',
+      durationSeconds,
+      interactions: currentIdx + 1,
+      avgReactionMs: session.latencyMs,
+      accuracy: session.canSwitchPerspective ? 100 : 0,
+      score: (currentIdx + 1) * 10 
+    };
+    setMetrics(m);
+    onUpdate?.(m);
+
     const isLast = currentIdx >= IMAGES.length - 1;
     if (isLast) {
-      const durationSeconds = Math.round((Date.now() - gameStartRef.current) / 1000);
-      onSessionEnd?.({
-        gameId: 'perception_probe',
-        gameName: 'Perspective Shift',
-        durationSeconds,
-        interactions: IMAGES.length,
-        avgReactionMs: session.latencyMs,
-        accuracy: session.canSwitchPerspective ? 100 : 0,
-        score: session.canSwitchPerspective ? 100 : 0
-      });
+      onSessionEnd?.(m);
     } else {
       setCurrentIdx((i) => i + 1);
       setFirstSeen(null);

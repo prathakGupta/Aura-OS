@@ -8,20 +8,20 @@
 //   GET  /api/clinical/dashboard/:userId— Aggregated recharts-ready data
 //   POST /api/clinical/therapy-brief    — Generate 14-day clinical PDF brief
 
-import UserState   from '../models/UserState.js';
-import AlertLog    from '../models/AlertLog.js';
-import ClinicalReport from '../models/ClinicalReport.js';
-import { generateGuardianBrief, generateRecoveryProtocol } from '../services/langchain.js';
-import { sendGuardianAlert }     from '../services/twilio.js';
-import { sendGuardianReportEmail } from '../services/email.js';
-import { buildClinicalReportPdfBuffer } from '../services/reportPdf.js';
-import { evaluateBurnoutRisk }   from '../services/triageEngine.js';
-import { AppError }              from '../middleware/errorHandler.js';
+import UserState   from "../models/UserState.js";
+import AlertLog    from "../models/AlertLog.js";
+import ClinicalReport from "../models/ClinicalReport.js";
+import { generateGuardianBrief, generateRecoveryProtocol } from "../services/langchain.js";
+import { sendGuardianAlert }     from "../services/twilio.js";
+import { sendGuardianReportEmail } from "../services/email.js";
+import { buildClinicalReportPdfBuffer } from "../services/reportPdf.js";
+import { evaluateBurnoutRisk }   from "../services/triageEngine.js";
+import { AppError }              from "../middleware/errorHandler.js";
 
 // Fallback cache for generating PDFs when MongoDB is offline
 const localMemoryReports = new Map();
 
-const toSafeString = (v, max = 300) => String(v || '').trim().slice(0, max);
+const toSafeString = (v, max = 300) => String(v || "").trim().slice(0, max);
 
 const normalizeWorryBlocks = (payloadBlocks = [], dbWorries = []) => {
   const fromPayload = Array.isArray(payloadBlocks)
@@ -30,7 +30,7 @@ const normalizeWorryBlocks = (payloadBlocks = [], dbWorries = []) => {
           id: toSafeString(w.id || w.uuid, 80),
           text: toSafeString(w.text || w.worry, 500),
           weight: Math.min(10, Math.max(1, Number(w.weight) || 5)),
-          status: ['active', 'destroyed', 'vaulted'].includes(w.status) ? w.status : 'active',
+          status: ["active", "destroyed", "vaulted"].includes(w.status) ? w.status : "active",
         }))
         .filter((w) => w.text)
     : [];
@@ -42,7 +42,7 @@ const normalizeWorryBlocks = (payloadBlocks = [], dbWorries = []) => {
       id: toSafeString(w.id, 80),
       text: toSafeString(w.worry, 500),
       weight: Math.min(10, Math.max(1, Number(w.weight) || 5)),
-      status: ['active', 'destroyed', 'vaulted'].includes(w.status) ? w.status : 'active',
+      status: ["active", "destroyed", "vaulted"].includes(w.status) ? w.status : "active",
     }))
     .filter((w) => w.text);
 };
@@ -79,16 +79,16 @@ const normalizeTimeline = (payloadTimeline = [], activeTask = null) => {
 const buildPublicReportUrl = (req, reportId) => {
   const base =
     process.env.REPORT_PUBLIC_BASE_URL
-    || `${req.protocol}://${req.get('host')}`;
+    || `${req.protocol}://${req.get("host")}`;
   return `${base}/api/clinical/session-report/${reportId}/pdf`;
 };
 
 const deliveryStatusFromResult = (result) => {
-  if (!result) return { attempted: false, status: 'skipped', sid: null, error: null };
-  if (result.skipped) return { attempted: false, status: 'skipped', sid: null, error: result.error || null };
-  if (result.mock) return { attempted: true, status: 'mock', sid: result.sid || null, error: null };
-  if (result.success) return { attempted: true, status: 'sent', sid: result.sid || result.messageId || null, error: null };
-  return { attempted: true, status: 'failed', sid: null, error: result.error || 'Delivery failed' };
+  if (!result) return { attempted: false, status: "skipped", sid: null, error: null };
+  if (result.skipped) return { attempted: false, status: "skipped", sid: null, error: result.error || null };
+  if (result.mock) return { attempted: true, status: "mock", sid: result.sid || null, error: null };
+  if (result.success) return { attempted: true, status: "sent", sid: result.sid || result.messageId || null, error: null };
+  return { attempted: true, status: "failed", sid: null, error: result.error || "Delivery failed" };
 };
 
 // ── POST /api/clinical/trigger-alert ─────────────────────────────────────────
@@ -102,13 +102,13 @@ export const triggerAlertHandler = async (req, res, next) => {
       guardianPhone, guardianName, guardianRelation, alertPreference,
     } = req.body;
 
-    if (!userId) throw new AppError('userId is required.', 400);
+    if (!userId) throw new AppError("userId is required.", 400);
 
-    const resolvedTaskSummary = String(taskSummary || currentTask || 'an overwhelming task').trim();
-    const resolvedBlocker = String(blocker || selectedBlocker || 'too_overwhelming').trim();
+    const resolvedTaskSummary = String(taskSummary || currentTask || "an overwhelming task").trim();
+    const resolvedBlocker = String(blocker || selectedBlocker || "too_overwhelming").trim();
     const parsedArousal = Number(vocalArousal ?? vocalArousalScore);
     const resolvedArousal = Number.isFinite(parsedArousal) ? Math.min(10, Math.max(1, parsedArousal)) : 8;
-    const resolvedEmotion = emotion || (resolvedArousal >= 8 ? 'high_anxiety' : resolvedArousal >= 5 ? 'mild_anxiety' : 'calm');
+    const resolvedEmotion = emotion || (resolvedArousal >= 8 ? "high_anxiety" : resolvedArousal >= 5 ? "mild_anxiety" : "calm");
 
     const user = await UserState.findOrCreate(userId);
     user.ensureClinicalTelemetry?.();
@@ -127,11 +127,11 @@ export const triggerAlertHandler = async (req, res, next) => {
     const telemetry = user.clinicalTelemetry || {};
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recentExecEvents = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > dayAgo);
-    const tasksAbandonedToday = recentExecEvents.filter((e) => e.status === 'abandoned').length;
+    const tasksAbandonedToday = recentExecEvents.filter((e) => e.status === "abandoned").length;
     const recentForgeCount = (telemetry.forgeSessions || []).filter((e) => new Date(e.timestamp) > dayAgo).length;
-    const recentExecSummary = recentExecEvents.slice(-8).map((e) => `${e.status} "${e.taskSummary || 'task'}"`).join(', ');
+    const recentExecSummary = recentExecEvents.slice(-8).map((e) => `${e.status} "${e.taskSummary || "task"}"`).join(", ");
 
-    const payloadHistory = (recentHistory && typeof recentHistory === 'object') ? recentHistory : null;
+    const payloadHistory = (recentHistory && typeof recentHistory === "object") ? recentHistory : null;
     const payloadHistoryParts = [];
     if (payloadHistory?.tasksAbandonedToday !== undefined) payloadHistoryParts.push(`Frontend signal: ${payloadHistory.tasksAbandonedToday} tasks abandoned today.`);
     if (payloadHistory?.forgeUsage) payloadHistoryParts.push(`Frontend forge usage: ${payloadHistory.forgeUsage}.`);
@@ -139,9 +139,9 @@ export const triggerAlertHandler = async (req, res, next) => {
 
     const recentPattern = [
       `Past 24h telemetry: ${tasksAbandonedToday} abandoned tasks, ${recentForgeCount} forge sessions.`,
-      recentExecSummary ? `Recent executive events: ${recentExecSummary}.` : 'No recent task history.',
+      recentExecSummary ? `Recent executive events: ${recentExecSummary}.` : "No recent task history.",
       ...payloadHistoryParts,
-    ].join(' ');
+    ].join(" ");
 
     let brief;
     try {
@@ -159,24 +159,24 @@ export const triggerAlertHandler = async (req, res, next) => {
         probeSessions: (telemetry.probeData || []).slice(-5).concat(snapshot.probeSessions || []),
         questTelemetry: snapshot.questTelemetry || [],
         gameSessions: snapshot.gameSessions || [],
-        auraAction: 'Somatic interruption (5-second breathing exercise) deployed. Brown noise environment activated.',
+        auraAction: "Somatic interruption (5-second breathing exercise) deployed. Brown noise environment activated.",
         recentPatterns: recentPattern,
       });
     } catch (aiErr) {
-      console.warn('[Clinical] LangChain brief generation failed, using fallback.', aiErr.message);
+      console.warn("[Clinical] LangChain brief generation failed, using fallback.", aiErr.message);
       brief = {
-        subject: 'AuraOS Alert - Stress Spike Detected',
-        analogy: 'A computer that has frozen because too many programmes tried to run at once.',
+        subject: "AuraOS Alert - Stress Spike Detected",
+        analogy: "A computer that has frozen because too many programmes tried to run at once.",
         vocal_analysis: `Vocal arousal detected at ${resolvedArousal}/10 - significantly elevated.`,
         observed_pattern: `The user attempted "${resolvedTaskSummary}" but reported acute overwhelm. Executive dysfunction freeze pattern.`,
-        aura_action_taken: 'A breathing exercise was deployed and a calming audio environment was activated.',
-        parent_action: 'Offer water and a brief walk. Try: "I see you are working really hard. Let\'s take a break together."',
-        risk_level: 'pre-burnout',
+        aura_action_taken: "A breathing exercise was deployed and a calming audio environment was activated.",
+        parent_action: "Offer water and a brief walk. Try: \"I see you are working really hard. Let's take a break together.\"",
+        risk_level: "pre-burnout",
       };
     }
 
     user.clinicalTelemetry.stressSpikes.push({
-      trigger: resolvedTaskSummary || 'unknown task',
+      trigger: resolvedTaskSummary || "unknown task",
       vocalArousal: resolvedArousal,
       emotion: resolvedEmotion,
       blocker: resolvedBlocker,
@@ -185,7 +185,7 @@ export const triggerAlertHandler = async (req, res, next) => {
     await user.save();
 
     const resolvedGuardianPhone = guardianPhone || user.guardian?.phone;
-    const channel = alertPreference || user.guardian?.alertPreference || 'whatsapp';
+    const channel = alertPreference || user.guardian?.alertPreference || "whatsapp";
     const deliveryResult = await sendGuardianAlert({ brief, userName: userId, guardianPhone: resolvedGuardianPhone, channel });
 
     const lastSpike = user.clinicalTelemetry.stressSpikes[user.clinicalTelemetry.stressSpikes.length - 1];
@@ -201,8 +201,8 @@ export const triggerAlertHandler = async (req, res, next) => {
       channel: deliveryResult.channel,
       riskLevel: brief.risk_level,
       triggerReason: `${resolvedBlocker} during "${resolvedTaskSummary}"`,
-      briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
-      deliveryStatus: deliveryResult.mock ? 'mock' : (deliveryResult.success ? 'sent' : 'failed'),
+      briefText: [brief.observed_pattern, brief.parent_action].join("\n\n").slice(0, 3000),
+      deliveryStatus: deliveryResult.mock ? "mock" : (deliveryResult.success ? "sent" : "failed"),
       twilioSid: deliveryResult.sid || null,
     });
 
@@ -221,7 +221,7 @@ export const triggerAlertHandler = async (req, res, next) => {
 export const logVocalStressHandler = async (req, res, next) => {
   try {
     const { userId, emotion, arousalScore, taskContext } = req.body;
-    if (!userId) throw new AppError('userId is required.', 400);
+    if (!userId) throw new AppError("userId is required.", 400);
 
     const user = await UserState.findOrCreate(userId);
     user.ensureClinicalTelemetry?.();
@@ -229,7 +229,7 @@ export const logVocalStressHandler = async (req, res, next) => {
     await user.save();
 
     evaluateBurnoutRisk(userId).then(async (risk) => {
-      if (risk.atRisk && risk.riskLevel === 'acute-distress') {
+      if (risk.atRisk && risk.riskLevel === "acute-distress") {
         console.log(`[Triage] Auto-alert triggered for ${userId}: ${risk.riskLevel}`);
       }
     }).catch(() => {});
@@ -246,7 +246,7 @@ export const logVocalStressHandler = async (req, res, next) => {
 export const setGuardianHandler = async (req, res, next) => {
   try {
     const { userId, name, email, phone, relation, alertPreference, reportFrequency } = req.body;
-    if (!userId) throw new AppError('userId is required.', 400);
+    if (!userId) throw new AppError("userId is required.", 400);
 
     const user = await UserState.findOrCreate(userId);
     const normalizedPhone = phone ? String(phone).trim() : undefined;
@@ -263,10 +263,10 @@ export const setGuardianHandler = async (req, res, next) => {
     };
 
     if (
-      (nextGuardian.alertPreference === 'whatsapp' || nextGuardian.alertPreference === 'sms')
+      (nextGuardian.alertPreference === "whatsapp" || nextGuardian.alertPreference === "sms")
       && !nextGuardian.phone
     ) {
-      throw new AppError('phone is required when alertPreference is whatsapp or sms.', 400);
+      throw new AppError("phone is required when alertPreference is whatsapp or sms.", 400);
     }
 
     user.guardian = nextGuardian;
@@ -284,7 +284,7 @@ export const getDashboardMetricsHandler = async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { days = 7 } = req.query;
-    if (!userId) throw new AppError('userId is required.', 400);
+    if (!userId) throw new AppError("userId is required.", 400);
     const parsedDays = Number(days);
     const safeDays = Number.isFinite(parsedDays)
       ? Math.min(30, Math.max(1, Math.floor(parsedDays)))
@@ -298,23 +298,23 @@ export const getDashboardMetricsHandler = async (req, res, next) => {
 
     // ── Vocal Stress Index (daily average) ──────────────────────────────────
     const vocalRaw  = (telemetry.vocalStressEvents || []).filter(e => new Date(e.timestamp) > since);
-    const vsiByDay  = _groupByDay(vocalRaw, e => e.arousalScore || 5, 'vsi');
+    const vsiByDay  = _groupByDay(vocalRaw, e => e.arousalScore || 5, "vsi");
 
     // ── Executive Function Score (completion ratio per day) ─────────────────
     const execRaw   = (telemetry.executiveFunction || []).filter(e => new Date(e.timestamp) > since);
-    const execByDay = _groupByDayRatio(execRaw, 'efScore');
+    const execByDay = _groupByDayRatio(execRaw, "efScore");
 
     // ── Forge Sessions (worry density per session) ───────────────────────────
     const forgeRaw  = (telemetry.forgeSessions || []).filter(e => new Date(e.timestamp) > since);
-    const forgeByDay= _groupByDay(forgeRaw, e => e.worryDensity || 5, 'density');
+    const forgeByDay= _groupByDay(forgeRaw, e => e.worryDensity || 5, "density");
 
     // ── Recent alert log ─────────────────────────────────────────────────────
     const alerts = await AlertLog.find({ userId }).sort({ sentAt: -1 }).limit(10).lean();
 
     // ── Summary stats ────────────────────────────────────────────────────────
     const stats = {
-      tasksCompleted:  execRaw.filter(e => e.status === 'completed').length,
-      tasksAbandoned:  execRaw.filter(e => e.status === 'abandoned').length,
+      tasksCompleted:  execRaw.filter(e => e.status === "completed").length,
+      tasksAbandoned:  execRaw.filter(e => e.status === "abandoned").length,
       forgeSessions:   forgeRaw.length,
       avgVocalArousal: vocalRaw.length ? +(vocalRaw.reduce((s,e) => s + (e.arousalScore||5), 0) / vocalRaw.length).toFixed(1) : 0,
       stressSpikes:    (telemetry.stressSpikes || []).filter(e => new Date(e.timestamp) > since).length,
@@ -338,10 +338,10 @@ export const getDashboardMetricsHandler = async (req, res, next) => {
 export const generateTherapyBriefHandler = async (req, res, next) => {
   try {
     const { userId } = req.body;
-    if (!userId) throw new AppError('userId is required.', 400);
+    if (!userId) throw new AppError("userId is required.", 400);
 
     const user = await UserState.findOne({ userId }).lean();
-    if (!user) throw new AppError('User not found.', 404);
+    if (!user) throw new AppError("User not found.", 404);
 
     const since     = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     const telemetry = user.clinicalTelemetry || {};
@@ -354,17 +354,17 @@ export const generateTherapyBriefHandler = async (req, res, next) => {
     const highArousalSessions = vocalEvents.filter(e => (e.arousalScore || 0) >= 7);
     const avgArousal = vocalEvents.length
       ? (vocalEvents.reduce((s,e) => s+(e.arousalScore||5),0)/vocalEvents.length).toFixed(1)
-      : 'N/A';
+      : "N/A";
 
-    const abandoned = execEvents.filter(e => e.status === 'abandoned');
-    const completed = execEvents.filter(e => e.status === 'completed');
+    const abandoned = execEvents.filter(e => e.status === "abandoned");
+    const completed = execEvents.filter(e => e.status === "completed");
 
     const brief = await generateGuardianBrief({
       userName:       userId,
       taskSummary:    `14-day clinical review (${execEvents.length} task interactions)`,
-      blocker:        abandoned.length > completed.length ? 'chronic task paralysis pattern' : 'intermittent executive function challenges',
+      blocker:        abandoned.length > completed.length ? "chronic task paralysis pattern" : "intermittent executive function challenges",
       vocalArousal:   parseFloat(avgArousal) || 5,
-      emotion:        highArousalSessions.length > 3 ? 'high_anxiety' : 'mild_anxiety',
+      emotion:        highArousalSessions.length > 3 ? "high_anxiety" : "mild_anxiety",
       auraAction:     `Over 14 days: ${forgeEvents.length} Cognitive Forge sessions, ${spikes.length} stress spikes detected.`,
       recentPatterns: `${completed.length} tasks completed, ${abandoned.length} abandoned. Average vocal arousal: ${avgArousal}/10. ${forgeEvents.length} worry-offloading sessions. ${spikes.length} acute stress spikes.`,
     });
@@ -372,7 +372,7 @@ export const generateTherapyBriefHandler = async (req, res, next) => {
     res.json({
       success:    true,
       generatedAt: new Date().toISOString(),
-      period:      '14 days',
+      period:      "14 days",
       brief,
       rawStats: {
         vocalSessions:     vocalEvents.length,
@@ -396,7 +396,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
   try {
     const {
       userId,
-      source = 'manual',
+      source = "manual",
       taskId,
       currentTask,
       selectedBlocker,
@@ -408,7 +408,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
       sessionSnapshot = {},
     } = req.body || {};
 
-    if (!userId) throw new AppError('userId is required.', 400);
+    if (!userId) throw new AppError("userId is required.", 400);
 
     let user = {};
     let activeTask = null;
@@ -416,17 +416,17 @@ export const generateSessionReportHandler = async (req, res, next) => {
       user = await UserState.findOrCreate(userId);
       activeTask = taskId
         ? (user.taskHistory || []).find((t) => t.id === taskId)
-        : (user.taskHistory || []).find((t) => t.status === 'active');
+        : (user.taskHistory || []).find((t) => t.status === "active");
     } catch (dbErr) {
-      console.warn('[Clinical] DB unavailable. Bypassing user lookup for report.', dbErr.message);
+      console.warn("[Clinical] DB unavailable. Bypassing user lookup for report.", dbErr.message);
     }
 
     const resolvedTask = toSafeString(
-      currentTask || activeTask?.originalTask || sessionSnapshot?.currentTask || '',
+      currentTask || activeTask?.originalTask || sessionSnapshot?.currentTask || "",
       500
     );
     const resolvedBlocker = toSafeString(
-      selectedBlocker || activeTask?.blocker || sessionSnapshot?.selectedBlocker || '',
+      selectedBlocker || activeTask?.blocker || sessionSnapshot?.selectedBlocker || "",
       200
     );
     const resolvedArousal = Math.min(10, Math.max(1, Number(vocalArousalScore) || 5));
@@ -434,32 +434,32 @@ export const generateSessionReportHandler = async (req, res, next) => {
     let brief;
     if (aiStressSummary) {
       brief = {
-        analogy: 'A system under sustained load and context switching.',
+        analogy: "A system under sustained load and context switching.",
         vocal_analysis: `Vocal arousal estimate: ${resolvedArousal}/10.`,
         observed_pattern: toSafeString(aiStressSummary, 700),
-        aura_action_taken: 'Supportive regulation prompts were provided inside AuraOS.',
-        parent_action: 'Use short, calm check-ins and one-step prompts.',
-        risk_level: resolvedArousal >= 8 ? 'acute-distress' : resolvedArousal >= 6 ? 'pre-burnout' : 'watch',
+        aura_action_taken: "Supportive regulation prompts were provided inside AuraOS.",
+        parent_action: "Use short, calm check-ins and one-step prompts.",
+        risk_level: resolvedArousal >= 8 ? "acute-distress" : resolvedArousal >= 6 ? "pre-burnout" : "watch",
       };
     } else {
       try {
         brief = await generateGuardianBrief({
           userName: userId,
-          taskSummary: resolvedTask || 'general stress event',
-          blocker: resolvedBlocker || 'overwhelm',
+          taskSummary: resolvedTask || "general stress event",
+          blocker: resolvedBlocker || "overwhelm",
           vocalArousal: resolvedArousal,
-          emotion: resolvedArousal >= 8 ? 'high_anxiety' : 'mild_anxiety',
-          auraAction: 'Somatic regulation and guided breakdown interventions were used.',
-          recentPatterns: 'Session-level snapshot report requested by the user.',
+          emotion: resolvedArousal >= 8 ? "high_anxiety" : "mild_anxiety",
+          auraAction: "Somatic regulation and guided breakdown interventions were used.",
+          recentPatterns: "Session-level snapshot report requested by the user.",
         });
       } catch {
         brief = {
-          analogy: 'A browser with too many active tabs.',
+          analogy: "A browser with too many active tabs.",
           vocal_analysis: `Vocal arousal estimate: ${resolvedArousal}/10.`,
-          observed_pattern: 'The session indicates elevated cognitive load and executive friction.',
-          aura_action_taken: 'AuraOS guided the user through supportive interruption and task decomposition.',
-          parent_action: 'Reduce demands briefly, validate effort, then suggest one tiny next step.',
-          risk_level: resolvedArousal >= 8 ? 'acute-distress' : resolvedArousal >= 6 ? 'pre-burnout' : 'watch',
+          observed_pattern: "The session indicates elevated cognitive load and executive friction.",
+          aura_action_taken: "AuraOS guided the user through supportive interruption and task decomposition.",
+          parent_action: "Reduce demands briefly, validate effort, then suggest one tiny next step.",
+          risk_level: resolvedArousal >= 8 ? "acute-distress" : resolvedArousal >= 6 ? "pre-burnout" : "watch",
         };
       }
     }
@@ -471,24 +471,24 @@ export const generateSessionReportHandler = async (req, res, next) => {
           status: "Snapshot Context Recovery Protocol",
           taskSummary: resolvedTask,
           vocalArousal: resolvedArousal,
-          emotion: resolvedArousal >= 8 ? 'high_anxiety' : 'mild_anxiety',
+          emotion: resolvedArousal >= 8 ? "high_anxiety" : "mild_anxiety",
         });
       } catch (err) {
-        console.warn('[Clinical] Recovery protocol inline generation failed', err.message);
+        console.warn("[Clinical] Recovery protocol inline generation failed", err.message);
       }
     }
 
     const draftReport = {
       userId,
-      source: ['panic', 'manual', 'auto'].includes(source) ? source : 'manual',
+      source: ["panic", "manual", "auto"].includes(source) ? source : "manual",
       currentTask: resolvedTask,
       selectedBlocker: resolvedBlocker,
       vocalArousalScore: resolvedArousal,
-      initialAnxietyQuery: toSafeString(initialAnxietyQuery || sessionSnapshot?.initialAnxietyQuery || '', 3000),
-      aiStressSummary: toSafeString(brief.observed_pattern || aiStressSummary || '', 2500),
-      riskLevel: ['watch', 'pre-burnout', 'acute-distress'].includes(brief.risk_level)
+      initialAnxietyQuery: toSafeString(initialAnxietyQuery || sessionSnapshot?.initialAnxietyQuery || "", 3000),
+      aiStressSummary: toSafeString(brief.observed_pattern || aiStressSummary || "", 2500),
+      riskLevel: ["watch", "pre-burnout", "acute-distress"].includes(brief.risk_level)
         ? brief.risk_level
-        : 'watch',
+        : "watch",
       shatteredWorryBlocks: normalizeWorryBlocks(sessionSnapshot?.shatteredWorryBlocks, user.vaultedWorries || []),
       timelineMicroquests: normalizeTimeline(sessionSnapshot?.timelineMicroquests, activeTask || null),
       gameSessions: Array.isArray(sessionSnapshot?.gameSessions) ? sessionSnapshot.gameSessions : [],
@@ -513,7 +513,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
       report = await ClinicalReport.create(draftReport);
       report._id = report._id.toString();
     } catch (dbErr) {
-      console.warn('[Clinical] Mongoose offline. Keeping report in memory for PDF generation.');
+      console.warn("[Clinical] Mongoose offline. Keeping report in memory for PDF generation.");
       report._id = fallbackReportId;
       localMemoryReports.set(fallbackReportId, report);
     }
@@ -521,19 +521,19 @@ export const generateSessionReportHandler = async (req, res, next) => {
     const downloadUrl = buildPublicReportUrl(req, report._id);
     const pdfBuffer = await buildClinicalReportPdfBuffer(report);
 
-    let whatsappResult = { skipped: true, channel: 'whatsapp' };
-    let emailResult = { skipped: true, channel: 'email' };
+    let whatsappResult = { skipped: true, channel: "whatsapp" };
+    let emailResult = { skipped: true, channel: "email" };
 
     if (sendToGuardian) {
-      const guardianPhone = report.guardian?.phone || '';
-      const guardianEmail = report.guardian?.email || '';
+      const guardianPhone = report.guardian?.phone || "";
+      const guardianEmail = report.guardian?.email || "";
 
       const shouldWhatsApp = Boolean(channels?.whatsapp !== false);
       const shouldEmail = Boolean(channels?.email !== false);
 
       const mediaBase = process.env.TWILIO_MEDIA_PUBLIC_BASE_URL || process.env.REPORT_PUBLIC_BASE_URL || null;
       const mediaUrl = mediaBase
-        ? `${mediaBase.replace(/\/$/, '')}/api/clinical/session-report/${report._id}/pdf`
+        ? `${mediaBase.replace(/\/$/, "")}/api/clinical/session-report/${report._id}/pdf`
         : null;
 
       const [waSettled, emailSettled] = await Promise.allSettled([
@@ -542,10 +542,10 @@ export const generateSessionReportHandler = async (req, res, next) => {
               brief,
               userName: userId,
               guardianPhone,
-              channel: user.guardian?.alertPreference || 'whatsapp',
+              channel: user.guardian?.alertPreference || "whatsapp",
               mediaUrl,
             })
-          : Promise.resolve({ skipped: true, channel: 'whatsapp' }),
+          : Promise.resolve({ skipped: true, channel: "whatsapp" }),
         shouldEmail
           ? sendGuardianReportEmail({
               to: guardianEmail,
@@ -557,33 +557,33 @@ export const generateSessionReportHandler = async (req, res, next) => {
               downloadUrl,
               pdfBuffer,
             })
-          : Promise.resolve({ skipped: true, channel: 'email' }),
+          : Promise.resolve({ skipped: true, channel: "email" }),
       ]);
 
-      whatsappResult = waSettled.status === 'fulfilled'
+      whatsappResult = waSettled.status === "fulfilled"
         ? waSettled.value
-        : { success: false, channel: 'whatsapp', error: waSettled.reason?.message || 'WhatsApp dispatch failed' };
+        : { success: false, channel: "whatsapp", error: waSettled.reason?.message || "WhatsApp dispatch failed" };
 
-      emailResult = emailSettled.status === 'fulfilled'
+      emailResult = emailSettled.status === "fulfilled"
         ? emailSettled.value
-        : { success: false, channel: 'email', error: emailSettled.reason?.message || 'Email dispatch failed' };
+        : { success: false, channel: "email", error: emailSettled.reason?.message || "Email dispatch failed" };
 
       try {
         await AlertLog.create({
           userId,
           guardianPhone: report.guardian?.phone || null,
           guardianEmail: report.guardian?.email || null,
-          channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
+          channel: whatsappResult.mock ? "mock" : (whatsappResult.success ? "whatsapp" : (emailResult.success ? "email" : "mock")),
           riskLevel: report.riskLevel,
-          triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
-          briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
+          triggerReason: `${report.selectedBlocker || "stress"} during "${report.currentTask || "session"}"`,
+          briefText: [brief.observed_pattern, brief.parent_action].join("\n\n").slice(0, 3000),
           deliveryStatus: whatsappResult.success || emailResult.success
-            ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
-            : 'failed',
+            ? (whatsappResult.mock && emailResult.mock ? "mock" : "sent")
+            : "failed",
           twilioSid: whatsappResult.sid || null,
         });
       } catch (dbErr) {
-        console.warn('[Clinical] AlertLog.create skipped (DB offline)');
+        console.warn("[Clinical] AlertLog.create skipped (DB offline)");
       }
     }
 
@@ -593,11 +593,11 @@ export const generateSessionReportHandler = async (req, res, next) => {
     };
     
     try {
-      if (typeof report.save === 'function') {
+      if (typeof report.save === "function") {
         await report.save();
       }
     } catch(e) {
-      console.warn('[Clinical] report.save skipped (DB offline)');
+      console.warn("[Clinical] report.save skipped (DB offline)");
     }
 
     res.json({
@@ -618,10 +618,10 @@ export const generateSessionReportHandler = async (req, res, next) => {
 export const downloadSessionReportPdfHandler = async (req, res, next) => {
   try {
     const { reportId } = req.params;
-    if (!reportId) throw new AppError('reportId is required.', 400);
+    if (!reportId) throw new AppError("reportId is required.", 400);
 
     let report = null;
-    if (reportId.startsWith('local-')) {
+    if (reportId.startsWith("local-")) {
       report = localMemoryReports.get(reportId);
     } else {
       try {
@@ -631,22 +631,22 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
       }
     }
 
-    if (!report) throw new AppError('Report not found or expired from local memory.', 404);
+    if (!report) throw new AppError("Report not found or expired from local memory.", 404);
 
     const pdfBuffer = await buildClinicalReportPdfBuffer(report);
 
-    if (!reportId.startsWith('local-')) {
+    if (!reportId.startsWith("local-")) {
       try {
         await ClinicalReport.updateOne(
           { _id: reportId },
-          { $inc: { 'meta.pdfDownloads': 1 } }
+          { $inc: { "meta.pdfDownloads": 1 } }
         );
       } catch (e) {}
     }
 
-    const filename = `AuraOS-Clinical-Report-${report.userId || 'user'}-${reportId}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    const filename = `AuraOS-Clinical-Report-${report.userId || "user"}-${reportId}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(pdfBuffer);
   } catch (err) {
     next(err);
@@ -657,7 +657,7 @@ function _groupByDay(events, valueFn, key) {
   events.forEach(e => {
     const dt = new Date(e.timestamp);
     if (Number.isNaN(dt.getTime())) return;
-    const day = dt.toISOString().split('T')[0];
+    const day = dt.toISOString().split("T")[0];
     if (!map[day]) map[day] = { day, sum: 0, count: 0 };
     map[day].sum += valueFn(e);
     map[day].count += 1;
@@ -672,10 +672,10 @@ function _groupByDayRatio(events, key) {
   events.forEach(e => {
     const dt = new Date(e.timestamp);
     if (Number.isNaN(dt.getTime())) return;
-    const day = dt.toISOString().split('T')[0];
+    const day = dt.toISOString().split("T")[0];
     if (!map[day]) map[day] = { day, completed: 0, total: 0 };
     map[day].total += 1;
-    if (e.status === 'completed') map[day].completed += 1;
+    if (e.status === "completed") map[day].completed += 1;
   });
   return Object.values(map)
     .map(d => ({
@@ -690,7 +690,7 @@ function _groupByDayRatio(events, key) {
 export const generateRecoveryProtocolHandler = async (req, res, next) => {
   try {
     const { userId, reportData } = req.body;
-    if (!userId) throw new AppError('userId is required.', 400);
+    if (!userId) throw new AppError("userId is required.", 400);
 
     let telemetryDataToUse = reportData;
     
@@ -707,7 +707,7 @@ export const generateRecoveryProtocolHandler = async (req, res, next) => {
           };
         }
       } catch (dbErr) {
-        console.warn('[Clinical] DB fetch failed. Mongoose might be offline. Proceeding with fallback.', dbErr.message);
+        console.warn("[Clinical] DB fetch failed. Mongoose might be offline. Proceeding with fallback.", dbErr.message);
       }
       
       if (!telemetryDataToUse) {

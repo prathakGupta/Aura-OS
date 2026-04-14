@@ -1,7 +1,7 @@
 // src/hooks/usePhysics.js
-import { useRef, useCallback, useEffect } from 'react';
-import Matter from 'matter-js';
-import confetti from 'canvas-confetti';
+import { useRef, useCallback, useEffect } from "react";
+import Matter from "matter-js";
+import confetti from "canvas-confetti";
 
 export default function usePhysics(canvasRef, onBlockDestroyed) {
   const engineRef = useRef(null);
@@ -27,7 +27,7 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
         width,
         height,
         wireframes: false,
-        background: 'transparent',
+        background: "transparent",
         pixelRatio: Math.min(window.devicePixelRatio || 1, 2)
       }
     });
@@ -41,21 +41,21 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
       
       const shelf = Matter.Bodies.rectangle(w / 2, h - 110, w * 0.7, 20, {
         isStatic: true,
-        label: 'boundary',
-        render: { fillStyle: 'rgba(255, 255, 255, 0.05)', strokeStyle: 'rgba(255, 255, 255, 0.1)', lineWidth: 1 },
+        label: "boundary",
+        render: { fillStyle: "rgba(255, 255, 255, 0.05)", strokeStyle: "rgba(255, 255, 255, 0.1)", lineWidth: 1 },
         chamfer: { radius: 10 }
       });
 
       const firePit = Matter.Bodies.rectangle(w / 2, h - 20, w * 1.5, 60, {
         isStatic: true,
         isSensor: true,
-        label: 'incinerator',
+        label: "incinerator",
         render: { visible: false }
       });
 
-      const leftWall = Matter.Bodies.rectangle(-25, h / 2, 50, h * 2, { isStatic: true, label: 'boundary' });
-      const rightWall = Matter.Bodies.rectangle(w + 25, h / 2, 50, h * 2, { isStatic: true, label: 'boundary' });
-      const ceiling = Matter.Bodies.rectangle(w / 2, -200, w * 2, 50, { isStatic: true, label: 'boundary' });
+      const leftWall = Matter.Bodies.rectangle(-25, h / 2, 50, h * 2, { isStatic: true, label: "boundary" });
+      const rightWall = Matter.Bodies.rectangle(w + 25, h / 2, 50, h * 2, { isStatic: true, label: "boundary" });
+      const ceiling = Matter.Bodies.rectangle(w / 2, -200, w * 2, 50, { isStatic: true, label: "boundary" });
       
       boundaryRef.current = [shelf, firePit, leftWall, rightWall, ceiling];
       Matter.World.add(world, boundaryRef.current);
@@ -74,7 +74,7 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
       constraint: {
         stiffness: 0.18,
         damping: 0.22,
-        render: { visible: true, lineWidth: 1, strokeStyle: 'rgba(251,191,36,0.3)' }
+        render: { visible: true, lineWidth: 1, strokeStyle: "rgba(251,191,36,0.3)" }
       }
     });
 
@@ -82,12 +82,12 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
     Matter.World.add(world, mouseConstraint);
 
     // Collision Detection
-    Matter.Events.on(engine, 'collisionStart', (event) => {
+    Matter.Events.on(engine, "collisionStart", (event) => {
       event.pairs.forEach(({ bodyA, bodyB }) => {
-        const isIncType = bodyA.label === 'incinerator' || bodyB.label === 'incinerator';
+        const isIncType = bodyA.label === "incinerator" || bodyB.label === "incinerator";
         if (!isIncType) return;
         
-        const block = bodyA.label === 'worry_block' ? bodyA : bodyB.label === 'worry_block' ? bodyB : null;
+        const block = bodyA.label === "worry_block" ? bodyA : bodyB.label === "worry_block" ? bodyB : null;
         if (block && !block.plugin?.consumed) {
           if (!block.plugin) block.plugin = {};
           block.plugin.consumed = true;
@@ -103,7 +103,7 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
               particleCount: 25,
               spread: 60,
               origin: { x: sx / window.innerWidth, y: sy / window.innerHeight },
-              colors: ['#f97316', '#f59e0b', '#67e8f9', '#c4b5fd'],
+              colors: ["#f97316", "#f59e0b", "#67e8f9", "#c4b5fd"],
               ticks: 85,
               gravity: 0.5,
               scalar: 0.8,
@@ -117,18 +117,18 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
     });
 
     // Label Rendering
-    Matter.Events.on(render, 'afterRender', () => {
+    Matter.Events.on(render, "afterRender", () => {
       const ctx = render.context;
       Matter.Composite.allBodies(world).forEach((body) => {
-        if (body.label === 'worry_block' && body.plugin?.text) {
+        if (body.label === "worry_block" && body.plugin?.text) {
           ctx.save();
           ctx.translate(body.position.x, body.position.y);
           ctx.rotate(body.angle);
-          ctx.font = '600 15px "Plus Jakarta Sans", system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = body.plugin.labelColor || 'rgba(255,241,242,0.95)';
-          ctx.shadowColor = 'rgba(0,0,0,0.5)';
+          ctx.font = "600 15px \"Plus Jakarta Sans\", system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = body.plugin.labelColor || "rgba(255,241,242,0.95)";
+          ctx.shadowColor = "rgba(0,0,0,0.5)";
           ctx.shadowBlur = 6;
           ctx.fillText(body.plugin.text, 0, 0);
           ctx.restore();
@@ -145,7 +145,7 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       render.canvas.width = cw * dpr;
       render.canvas.height = height * dpr;
-      render.canvas.style.width = '100%';
+      render.canvas.style.width = "100%";
       render.canvas.style.height = `${height}px`;
       
       // Update the mouse mapping coordinates directly to the new canvas size
@@ -157,11 +157,11 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
     syncSize();
 
     let resizeObserver = null;
-    if (typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== "undefined") {
       resizeObserver = new ResizeObserver(syncSize);
       resizeObserver.observe(container);
     } else {
-      window.addEventListener('resize', syncSize);
+      window.addEventListener("resize", syncSize);
     }
 
     // Attach observer to render object for cleanup
@@ -189,23 +189,23 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
         const weight = Math.floor(Math.random() * 4) + 4; 
         
         const block = Matter.Bodies.rectangle(x, y, blockW, 46, {
-          label: 'worry_block',
+          label: "worry_block",
           restitution: 0.12,
           frictionAir: 0.04,
           friction: 0.85,
           density: 0.006 + weight * 0.0003,
           chamfer: { radius: 10 },
           render: {
-            fillStyle: '#1e3a5f',
-            strokeStyle: 'rgba(103,232,249,0.3)',
+            fillStyle: "#1e3a5f",
+            strokeStyle: "rgba(103,232,249,0.3)",
             lineWidth: 1.5
           }
         });
         
         block.plugin = {
-          kind: 'worry_block',
+          kind: "worry_block",
           text: word,
-          labelColor: '#cffafe',
+          labelColor: "#cffafe",
           uuid: `word-${Date.now()}-${index}`,
           consumed: false
         };
@@ -219,7 +219,7 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
   const clearAll = useCallback(() => {
     if (!engineRef.current) return;
     const world = engineRef.current.world;
-    const bodies = Matter.Composite.allBodies(world).filter(b => b.label === 'worry_block');
+    const bodies = Matter.Composite.allBodies(world).filter(b => b.label === "worry_block");
     bodies.forEach(b => Matter.Composite.remove(world, b));
   }, []);
 
@@ -229,7 +229,7 @@ export default function usePhysics(canvasRef, onBlockDestroyed) {
         if (renderRef.current.resizeObserver) {
           renderRef.current.resizeObserver.disconnect();
         } else {
-          window.removeEventListener('resize', () => {});
+          window.removeEventListener("resize", () => {});
         }
         Matter.Render.stop(renderRef.current);
         if (renderRef.current.canvas && renderRef.current.canvas.parentNode) {

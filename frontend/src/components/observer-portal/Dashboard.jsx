@@ -232,6 +232,35 @@ export default function Dashboard() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Recent Alerts */}
+            {data.recentAlerts?.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a2633', marginBottom: 10 }}>Recent Alerts</h3>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
+                  {data.recentAlerts.map((alert, index) => (
+                    <li key={index} style={{ background: '#fff', padding: '10px 15px', borderRadius: 8, marginBottom: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+                      <p style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>{new Date(alert.sentAt).toLocaleString()}</p>
+                      <p style={{ fontSize: 14, color: '#1a2633' }}>{alert.message}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Charts */}
+            <div style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a2633', marginBottom: 10 }}>Clinical Charts</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={data.charts?.vsiByDay || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="vsi" fill="#7c3aed" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </motion.div>
         )}
       </div>

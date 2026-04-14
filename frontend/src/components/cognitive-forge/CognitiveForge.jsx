@@ -235,7 +235,7 @@ function GameShell({ title, color, score, unit, onEnd, instruction, children }) 
         </span>
         <button onClick={onEnd}
           style={{ fontSize:11, padding:'5px 16px', borderRadius:999, background:`${color}12`, border:`1px solid ${color}30`, color, fontWeight:700, cursor:'pointer', letterSpacing:'-0.01em' }}>
-          End + Log
+          End Session
         </button>
       </div>
     </div>
@@ -253,7 +253,7 @@ function GameShell({ title, color, score, unit, onEnd, instruction, children }) 
 //
 // Clinical: arousal regulation, impulse control, tension timing
 // ════════════════════════════════════════════════════════════════════════════════
-function SqueezeRelease({ onSessionEnd }) {
+function SqueezeRelease({ onSessionEnd, onUpdate }) {
   const [pressure,  setPressure]  = useState(0);
   const [holding,   setHolding]   = useState(false);
   const [score,     setScore]     = useState(0);
@@ -305,10 +305,21 @@ function SqueezeRelease({ onSessionEnd }) {
   const handleEnd = () => {
     const dur  = Math.round((Date.now() - startRef.current) / 1000);
     const avgQ = qualities.length ? Math.round(qualities.reduce((a,b)=>a+b,0) / qualities.length) : 0;
-    onSessionEnd({ gameId:'squeeze_release', gameName:'Squeeze Release',
+    const metrics = { gameId:'squeeze_release', gameName:'Squeeze Release',
       durationSeconds:dur, interactions:score, avgReactionMs:600, accuracy:avgQ, score,
-      extraData:{ avgQuality:avgQ } });
+      extraData:{ avgQuality:avgQ } };
+    onSessionEnd(metrics);
   };
+
+  useEffect(() => {
+    if (onUpdate && (score > 0 || qualities.length > 0)) {
+      const dur  = Math.round((Date.now() - startRef.current) / 1000);
+      const avgQ = qualities.length ? Math.round(qualities.reduce((a,b)=>a+b,0) / qualities.length) : 0;
+      onUpdate({ gameId:'squeeze_release', gameName:'Squeeze Release',
+        durationSeconds:dur, interactions:score, avgReactionMs:600, accuracy:avgQ, score,
+        extraData:{ avgQuality:avgQ } });
+    }
+  }, [score, qualities, onUpdate]);
 
   // ── Derived display values (pure arithmetic, no trig) ──────────────────
   const pct          = pressure;                   // 0–100
@@ -337,7 +348,7 @@ function SqueezeRelease({ onSessionEnd }) {
         style={{
           width:'100%', height:'100%',
           cursor: holding ? 'grabbing' : 'grab',
-          background: `radial-gradient(ellipse at 50% 60%, ${fillColor}12, transparent 65%), #0d0208`,
+          background: `radial-gradient(ellipse at 50% 60%, ${fillColor}12, transparent 65%), var(--bg-void)`,
           display:'flex', flexDirection:'column',
           alignItems:'center', justifyContent:'space-between',
           userSelect:'none', WebkitUserSelect:'none',
@@ -513,7 +524,7 @@ const SORT_COLORS = [
   { id:'green',  hex:'#00e676', dark:'rgba(6,78,59,0.7)'   },
 ];
 
-function ColorSort({ onSessionEnd }) {
+function ColorSort({ onSessionEnd, onUpdate }) {
   const [queue,    setQueue]    = useState(() => Array.from({length:14},()=>SORT_COLORS[Math.floor(Math.random()*4)]));
   const [tubes,    setTubes]    = useState([0,0,0,0]);
   const [correct,  setCorrect]  = useState(0);
@@ -579,8 +590,16 @@ function ColorSort({ onSessionEnd }) {
   const accuracy = correct+mistakes > 0 ? Math.round(correct/(correct+mistakes)*100) : 100;
   const handleEnd = () => {
     const dur = Math.round((Date.now()-startRef.current)/1000);
-    onSessionEnd({ gameId:'color_sort', gameName:'Color Sort', durationSeconds:dur, interactions:correct+mistakes, avgReactionMs:800, accuracy, score:correct, extraData:{ mistakes } });
+    const metrics = { gameId:'color_sort', gameName:'Color Sort', durationSeconds:dur, interactions:correct+mistakes, avgReactionMs:800, accuracy, score:correct, extraData:{ mistakes } };
+    onSessionEnd(metrics);
   };
+
+  useEffect(() => {
+    if (onUpdate && (correct > 0 || mistakes > 0)) {
+      const dur = Math.round((Date.now()-startRef.current)/1000);
+      onUpdate({ gameId:'color_sort', gameName:'Color Sort', durationSeconds:dur, interactions:correct+mistakes, avgReactionMs:800, accuracy, score:correct, extraData:{ mistakes } });
+    }
+  }, [correct, mistakes, accuracy, onUpdate]);
 
   const containerRect = containerRef.current?.getBoundingClientRect();
 
@@ -592,7 +611,7 @@ function ColorSort({ onSessionEnd }) {
         onMouseMove={moveDrag} onMouseUp={endDrag}
         onTouchMove={moveDrag} onTouchEnd={endDrag}
         style={{ width:'100%', height:'100%', position:'relative',
-          background:'radial-gradient(ellipse at 50% 20%, rgba(0,229,255,0.09), transparent 60%), #020c14',
+          background:'radial-gradient(ellipse at 50% 20%, rgba(0,229,255,0.09), transparent 60%), var(--bg-void)',
           userSelect:'none', WebkitUserSelect:'none', borderRadius:14,
         }}
       >
@@ -692,7 +711,7 @@ function ColorSort({ onSessionEnd }) {
 const NEG_WORDS = ['STRESS','WORRY','FEAR','DOUBT','PANIC','DREAD','FAIL','STUCK','LOST','NUMB','TIRED','SHAME'];
 const POS_WORDS = ['FREE','BRAVE','PEACE','STRONG','RISE','CALM','BRIGHT','ALIVE','SAFE'];
 
-function WordSmash({ onSessionEnd }) {
+function WordSmash({ onSessionEnd, onUpdate }) {
   const [words, setWords] = useState(() => Array.from({length:6},(_,i)=>({
     id:i, word:NEG_WORDS[i%NEG_WORDS.length], x:8+(i*14)%78, y:90+i*14,
     speed:0.35+Math.random()*0.3, smashed:false, rotation:(Math.random()-0.5)*20, repl:null, replTimer:0,
@@ -711,10 +730,22 @@ function WordSmash({ onSessionEnd }) {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
   const smashWord = id => { playSmash(); setScore(s=>s+1); setWords(prev=>prev.map(w=>w.id===id?{...w,smashed:true,repl:POS_WORDS[Math.floor(Math.random()*POS_WORDS.length)],replTimer:55}:w)); };
+  const handleEnd = () => {
+    const metrics = { gameId:'word_smash', gameName:'Word Smash', durationSeconds:Math.round((Date.now()-startRef.current)/1000), interactions:score, avgReactionMs:700, accuracy:100, score };
+    onSessionEnd(metrics);
+  };
+  
+  useEffect(() => {
+    if (onUpdate && score > 0) {
+      const metrics = { gameId:'word_smash', gameName:'Word Smash', durationSeconds:Math.round((Date.now()-startRef.current)/1000), interactions:score, avgReactionMs:700, accuracy:100, score };
+      onUpdate(metrics);
+    }
+  }, [score, onUpdate]);
+
   return (
-    <GameShell title="Word Smash" color="#ff6b8a" score={score} unit="crushed" onEnd={() => onSessionEnd({ gameId:'word_smash', gameName:'Word Smash', durationSeconds:Math.round((Date.now()-startRef.current)/1000), interactions:score, avgReactionMs:700, accuracy:100, score })}
+    <GameShell title="Word Smash" color="#ff6b8a" score={score} unit="crushed" onEnd={handleEnd}
       instruction="Smash the negative words before they escape!">
-      <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden', background:'radial-gradient(ellipse at 50% 60%, rgba(255,107,138,0.08), transparent 65%), #0a0310', borderRadius:14 }}>
+      <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden', background:'radial-gradient(ellipse at 50% 60%, rgba(255,107,138,0.08), transparent 65%), var(--bg-void)', borderRadius:14 }}>
         {words.map(w => (
           <motion.div key={w.id} style={{ position:'absolute', left:`${w.x}%`, top:`${w.y}%`, transform:`translate(-50%,-50%) rotate(${w.rotation}deg)` }}>
             {w.smashed ? (
@@ -740,7 +771,7 @@ function WordSmash({ onSessionEnd }) {
 // ════════════════════════════════════════════════════════════════════════════════
 const GRID_COLORS = ['#00e5ff','#ff6b8a','#c4b5fd','#ffb300','#00e676','#5eead4','#fb7185','#a78bfa','#fbbf24'];
 
-function MemoryPulse({ onSessionEnd }) {
+function MemoryPulse({ onSessionEnd, onUpdate }) {
   const [phase,    setPhase]    = useState('waiting');
   const [level,    setLevel]    = useState(1);
   const [sequence, setSequence] = useState([]);
@@ -796,8 +827,22 @@ function MemoryPulse({ onSessionEnd }) {
   };
 
   const accuracy = attempts.c+attempts.w > 0 ? Math.round(attempts.c/(attempts.c+attempts.w)*100) : 100;
+  
+  const handleEnd = () => {
+    const dur = Math.round((Date.now()-startRef.current)/1000);
+    const metrics = { gameId:'memory_pulse', gameName:'Memory Pulse', durationSeconds:dur, interactions:attempts.c+attempts.w, avgReactionMs:700, accuracy, score, extraData:{ maxLevel } };
+    onSessionEnd(metrics);
+  };
+
+  useEffect(() => {
+    if (onUpdate && (attempts.c > 0 || attempts.w > 0)) {
+       const dur = Math.round((Date.now()-startRef.current)/1000);
+       onUpdate({ gameId:'memory_pulse', gameName:'Memory Pulse', durationSeconds:dur, interactions:attempts.c+attempts.w, avgReactionMs:700, accuracy, score, extraData:{ maxLevel } });
+    }
+  }, [attempts, maxLevel, score, onUpdate]);
+
   return (
-    <GameShell title="Memory Pulse" color="#c4b5fd" score={score} unit="pts" onEnd={()=>{ const dur=Math.round((Date.now()-startRef.current)/1000); onSessionEnd({gameId:'memory_pulse',gameName:'Memory Pulse',durationSeconds:dur,interactions:attempts.c+attempts.w,avgReactionMs:700,accuracy,score,extraData:{maxLevel}}); }}
+    <GameShell title="Memory Pulse" color="#c4b5fd" score={score} unit="pts" onEnd={handleEnd}
       instruction={phase==='input'?'Your turn — repeat the sequence!':'Watch the flashing pattern…'}>
       <div style={{ width:'100%', height:'100%', background:'radial-gradient(ellipse at 50% 40%, rgba(196,181,253,0.1), transparent 65%), #060212', borderRadius:14, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14 }}>
         {phase === 'waiting' ? (
@@ -840,7 +885,7 @@ function MemoryPulse({ onSessionEnd }) {
 // ════════════════════════════════════════════════════════════════════════════════
 // GAME 5 — NUMBER DASH (Schulte Table)
 // ════════════════════════════════════════════════════════════════════════════════
-function NumberDash({ onSessionEnd }) {
+function NumberDash({ onSessionEnd, onUpdate }) {
   const [phase,     setPhase]     = useState('waiting');
   const [grid,      setGrid]      = useState([]);
   const [next,      setNext]      = useState(1);
@@ -868,8 +913,21 @@ function NumberDash({ onSessionEnd }) {
     } else { playWrong(); setFlashCell(num); setFlashOk(false); setMistakes(m=>m+1); setTimeout(()=>setFlashCell(null),300); }
   };
   const bestTime = attempts.length?Math.min(...attempts):null;
+  const handleEnd = () => {
+    const dur=Math.round((Date.now()-startRef.current)/1000); const bt=bestTime||dur;
+    const metrics = {gameId:'number_dash',gameName:'Number Dash',durationSeconds:dur,interactions:attempts.length*16+next-1,avgReactionMs:bt?Math.round((bt/16)*1000):1000,accuracy:100,score:attempts.length,extraData:{bestTime:bt,avgTime:attempts.length?Math.round(attempts.reduce((a,b)=>a+b,0)/attempts.length*10)/10:null}};
+    onSessionEnd(metrics);
+  };
+
+  useEffect(() => {
+    if (onUpdate && (attempts.length > 0 || next > 1)) {
+      const dur=Math.round((Date.now()-startRef.current)/1000); const bt=bestTime||dur;
+      onUpdate({gameId:'number_dash',gameName:'Number Dash',durationSeconds:dur,interactions:attempts.length*16+next-1,avgReactionMs:bt?Math.round((bt/16)*1000):1000,accuracy:100,score:attempts.length,extraData:{bestTime:bt,avgTime:attempts.length?Math.round(attempts.reduce((a,b)=>a+b,0)/attempts.length*10)/10:null}});
+    }
+  }, [attempts.length, next, onUpdate, bestTime]);
+
   return (
-    <GameShell title="Number Dash" color="#ffb300" score={attempts.length} unit="rounds" onEnd={()=>{ const dur=Math.round((Date.now()-startRef.current)/1000); const bt=bestTime||dur; onSessionEnd({gameId:'number_dash',gameName:'Number Dash',durationSeconds:dur,interactions:attempts.length*16+next-1,avgReactionMs:bt?Math.round((bt/16)*1000):1000,accuracy:100,score:attempts.length,extraData:{bestTime:bt,avgTime:attempts.length?Math.round(attempts.reduce((a,b)=>a+b,0)/attempts.length*10)/10:null}}); }}
+    <GameShell title="Number Dash" color="#ffb300" score={attempts.length} unit="rounds" onEnd={handleEnd}
       instruction="Click 1 → 16 in order, as fast as possible">
       <div style={{width:'100%',height:'100%',background:'radial-gradient(ellipse at 50% 30%, rgba(255,179,0,0.1), transparent 60%), #080500',borderRadius:14,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10,padding:'8px 0'}}>
         {phase==='waiting'||phase==='done'?(
@@ -914,7 +972,7 @@ function NumberDash({ onSessionEnd }) {
 // ════════════════════════════════════════════════════════════════════════════════
 // GAME 6 — BREATHE FLOW
 // ════════════════════════════════════════════════════════════════════════════════
-function BreatheFlow({ onSessionEnd }) {
+function BreatheFlow({ onSessionEnd, onUpdate }) {
   const [phase,      setPhase]      = useState('waiting');
   const [guideSize,  setGuideSize]  = useState(0);
   const [playerSize, setPlayerSize] = useState(0);
@@ -963,8 +1021,22 @@ function BreatheFlow({ onSessionEnd }) {
   const syncColor=syncPct>75?'#00e676':syncPct>50?'#5eead4':syncPct>30?'#ffb300':'#ff6b8a';
   const guideR=44+guideSize*0.5, playerR=44+playerSize*0.5;
 
+  const handleEnd = () => {
+    cancelAnimationFrame(rafRef.current);
+    const dur=Math.round((Date.now()-startRef.current)/1000);
+    const metrics = {gameId:'breathe_flow',gameName:'Breathe Flow',durationSeconds:dur,interactions:Math.max(1,cycle),avgReactionMs:1000,accuracy:syncPct,score:Math.round(calmScore),extraData:{avgDeviation:avgDev,cycles:Math.max(1,cycle)}};
+    onSessionEnd(metrics);
+  };
+  
+  useEffect(() => {
+    if (onUpdate && (cycle > 0 || calmScore > 5)) {
+      const dur=Math.round((Date.now()-startRef.current)/1000);
+      onUpdate({gameId:'breathe_flow',gameName:'Breathe Flow',durationSeconds:dur,interactions:Math.max(1,cycle),avgReactionMs:1000,accuracy:syncPct,score:Math.round(calmScore),extraData:{avgDeviation:avgDev,cycles:Math.max(1,cycle)}});
+    }
+  }, [cycle, calmScore, onUpdate, syncPct]);
+
   return (
-    <GameShell title="Breathe Flow" color="#5eead4" score={Math.round(calmScore)} unit="calm" onEnd={()=>{ cancelAnimationFrame(rafRef.current); const dur=Math.round((Date.now()-startRef.current)/1000); onSessionEnd({gameId:'breathe_flow',gameName:'Breathe Flow',durationSeconds:dur,interactions:Math.max(1,cycle),avgReactionMs:1000,accuracy:syncPct,score:Math.round(calmScore),extraData:{avgDeviation:avgDev,cycles:Math.max(1,cycle)}}); }}
+    <GameShell title="Breathe Flow" color="#5eead4" score={Math.round(calmScore)} unit="calm" onEnd={handleEnd}
       instruction="Hold to inhale · release to exhale · match the guide orb">
       <div
         onMouseDown={()=>{if(phase==='running'){setHolding(true);playBreathe(true);}}}
@@ -1195,6 +1267,9 @@ export default function CognitiveForge() {
   const [gameSessions, setGameSessions] = useState([]);
   const [reportBusy, setReportBusy] = useState(false);
   const [reportMsg, setReportMsg] = useState(null);
+  
+  // Ref to track live session metrics for auto-saving on 'X' close
+  const pendingSessionRef = useRef(null);
 
   const { userId, worries, setWorries, markWorryDestroyed } = useStore();
   useEffect(() => { reframeRef.current = reframeText; }, [reframeText]);
@@ -1234,12 +1309,27 @@ export default function CognitiveForge() {
     init();
   }, [init]);
 
-  const handleGameSessionEnd = useCallback(rawMetrics => {
-    const predictedEffects = derivePredictedEffects(rawMetrics.gameId, rawMetrics);
-    setGameSessions(prev => [...prev, { ...rawMetrics, predictedEffects, completedAt: new Date().toISOString() }]);
+  const handleGameUpdate = useCallback(metrics => {
+    pendingSessionRef.current = { ...metrics, completedAt: new Date().toISOString() };
+  }, []);
+
+  const handleGameSessionEnd = useCallback(finalMetrics => {
+    const data = finalMetrics || pendingSessionRef.current;
+    if (!data) {
+      setActiveGame(null);
+      return;
+    }
+
+    // Only log if there was some actual activity (> 1 interaction or meaningfully started)
+    if (data.interactions > 0 || data.durationSeconds > 4) {
+      const predictedEffects = derivePredictedEffects(data.gameId, data);
+      setGameSessions(prev => [...prev, { ...data, predictedEffects }]);
+      setReportMsg(`${data.gameName} logged · ${data.durationSeconds}s`);
+      setTimeout(() => setReportMsg(null), 3000);
+    }
+
+    pendingSessionRef.current = null;
     setActiveGame(null);
-    setReportMsg(`${rawMetrics.gameName} logged · ${rawMetrics.durationSeconds}s`);
-    setTimeout(() => setReportMsg(null), 3000);
   }, []);
 
   const handleExtract = async () => {
@@ -1493,12 +1583,12 @@ export default function CognitiveForge() {
                       <p style={{fontSize:9.5,color:'var(--text-3)'}}>Interaction data feeds your behavioral health profile</p>
                     </div>
                   </div>
-                  <button onClick={()=>setActiveGame(null)} style={{width:30,height:30,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',cursor:'pointer'}}>
+                  <button onClick={() => handleGameSessionEnd()} style={{width:30,height:30,borderRadius:'50%',background:'rgba(255,255,255,0.06)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',cursor:'pointer'}}>
                     <X size={13}/>
                   </button>
                 </div>
                 <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column',minHeight:350,position:'relative'}}>
-                  <ActiveGameComponent onSessionEnd={handleGameSessionEnd}/>
+                  <ActiveGameComponent onSessionEnd={handleGameSessionEnd} onUpdate={handleGameUpdate}/>
                 </div>
               </motion.div>
             </motion.div>

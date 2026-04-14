@@ -46,7 +46,7 @@ const GuardianDetails = ({ signupData, onBack }) => {
   return (
     <div className="auth-form">
       <div className="auth-heading">
-        <h1>Guardian details</h1>
+        <h1 className="aura-heading-gradient">Guardian details</h1>
         <p>This helps us support you more safely when needed.</p>
       </div>
 
@@ -64,6 +64,7 @@ const GuardianDetails = ({ signupData, onBack }) => {
           <label>Guardian full name</label>
           <input
             type="text"
+            className="aura-input-unified"
             placeholder="Their full name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -75,6 +76,7 @@ const GuardianDetails = ({ signupData, onBack }) => {
           <label>Relationship to you</label>
           <input
             type="text"
+            className="aura-input-unified"
             placeholder="e.g. Parent, Therapist, Sibling"
             value={relationship}
             onChange={(e) => setRelationship(e.target.value)}
@@ -86,6 +88,7 @@ const GuardianDetails = ({ signupData, onBack }) => {
           <label>Guardian email</label>
           <input
             type="email"
+            className="aura-input-unified"
             placeholder="their@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -97,6 +100,7 @@ const GuardianDetails = ({ signupData, onBack }) => {
           <label>Guardian phone number</label>
           <input
             type="tel"
+            className="aura-input-unified"
             placeholder="+91 00000 00000"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}

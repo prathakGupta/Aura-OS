@@ -26,8 +26,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/auth" replace />;
   }
 
-  // Logged in but onboarding not complete
-  if (!onboardingComplete && window.location.pathname !== "/auth/guardian") {
+  // Logged in but onboarding not complete (only for 'user' role)
+  if (role === "user" && !onboardingComplete && window.location.pathname !== "/auth/guardian") {
     return <Navigate to="/auth/guardian" replace />;
   }
 

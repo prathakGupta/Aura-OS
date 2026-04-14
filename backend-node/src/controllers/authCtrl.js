@@ -14,9 +14,10 @@ dotenv.config();
 export const getMe = async (req, res) => {
   try {
     if (!req.user) {
-      return res.status(404).json({
-        success: false,
-        message: "Profile not found",
+      return res.status(200).json({
+        success: true,
+        exists: false,
+        message: "Profile not found in MongoDB",
       });
     }
 
@@ -61,7 +62,7 @@ export const createProfile = async (req, res) => {
         $setOnInsert: {
           firebaseUid: uid,
           email,
-          fullName,
+          fullName: fullName && fullName.trim() !== "" ? fullName : (email ? email.split("@")[0] : "Aura User"),
           authProvider: authProvider || "email",
           role: "user",
           onboardingComplete: false,

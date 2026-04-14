@@ -1,7 +1,7 @@
 // src/routes/clinical.js  🌟 NEW
-import express from 'express';
-import { asyncHandler } from '../middleware/errorHandler.js';
-import verifyToken from '../middleware/verifyToken.js';
+import express from "express";
+import { asyncHandler } from "../middleware/errorHandler.js";
+import verifyToken from "../middleware/verifyToken.js";
 import {
   triggerAlertHandler,
   logVocalStressHandler,
@@ -11,31 +11,31 @@ import {
   generateSessionReportHandler,
   downloadSessionReportPdfHandler,
   generateRecoveryProtocolHandler,
-} from '../controllers/clinicalCtrl.js';
+} from "../controllers/clinicalCtrl.js";
 
 const router = express.Router();
 
 // Panic trigger from TaskShatter (most critical — fast path)
-router.post('/trigger-alert',   asyncHandler(triggerAlertHandler));
+router.post("/trigger-alert",   asyncHandler(triggerAlertHandler));
 
 // Vocal stress event logging (called by Python backend proxy or direct)
-router.post('/vocal-stress',    asyncHandler(logVocalStressHandler));
+router.post("/vocal-stress",    asyncHandler(logVocalStressHandler));
 
 // Guardian setup/update
-router.post('/guardian',        asyncHandler(setGuardianHandler));
-router.put('/guardian',         asyncHandler(setGuardianHandler));
+router.post("/guardian",        asyncHandler(setGuardianHandler));
+router.put("/guardian",         asyncHandler(setGuardianHandler));
 
 // Observer Portal data
-router.get('/dashboard/:userId', verifyToken, asyncHandler(getDashboardMetricsHandler));
+router.get("/dashboard/:userId", verifyToken, asyncHandler(getDashboardMetricsHandler));
 
 // Therapy brief generation
-router.post('/therapy-brief', verifyToken, asyncHandler(generateTherapyBriefHandler));
+router.post("/therapy-brief", verifyToken, asyncHandler(generateTherapyBriefHandler));
 
 // Session report generation + manual PDF download
-router.post('/session-report', asyncHandler(generateSessionReportHandler));
-router.get('/session-report/:reportId/pdf', asyncHandler(downloadSessionReportPdfHandler));
+router.post("/session-report", asyncHandler(generateSessionReportHandler));
+router.get("/session-report/:reportId/pdf", asyncHandler(downloadSessionReportPdfHandler));
 
 // Recovery Protocol generation
-router.post('/recovery-protocol', asyncHandler(generateRecoveryProtocolHandler));
+router.post("/recovery-protocol", asyncHandler(generateRecoveryProtocolHandler));
 
 export default router;

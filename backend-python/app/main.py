@@ -1,20 +1,7 @@
 # app/main.py
 import sys
-# Monkey-patch pydantic.v1.typing for Python 3.12.4+ compatibility
-import pydantic.v1.typing
-_original_evaluate = pydantic.v1.typing.evaluate_forwardref
-def _evaluate_patched(type_, globalns, localns):
-    import typing
-    try:
-        return _original_evaluate(type_, globalns, localns)
-    except TypeError:
-        return typing.cast(typing.Any, type_)._evaluate(globalns, localns, recursive_guard=set())
-pydantic.v1.typing.evaluate_forwardref = _evaluate_patched
-
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.api.routes_audio import router as audio_router
 from app.api.routes_tasks import router as tasks_router
@@ -23,6 +10,9 @@ from app.api.routes_rag import router as rag_router
 from app.api.routes_behavioral import router as behavioral_router
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.core.config import settings
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
