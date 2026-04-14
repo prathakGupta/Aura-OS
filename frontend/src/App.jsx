@@ -74,7 +74,7 @@ export default function App() {
     setActiveTask,
     userProfile, setUserProfile, clearUserProfile,
   } = useStore();
-  const { user, profile, onboardingComplete, role, logout} = useAuth();
+  const { user, profile, onboardingComplete, role } = useAuth();
   const navigate = useNavigate();
 
   const [initError,    setInitError]    = useState(false);
@@ -93,9 +93,15 @@ export default function App() {
 
   /* ── Session init ── */
   useEffect(() => {
-    initSession().catch(() => setInitError(true));
-    // initSession is stable (created once by zustand) — no dep needed
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const runInit = async () => {
+      try {
+        await initSession();
+      } catch {
+        setInitError(true);
+      }
+    };
+    runInit();
+  }, [initSession]);
 
   /* ── Show intake on first visit (no stored profile) ── */
   useEffect(() => {
@@ -415,7 +421,6 @@ export default function App() {
   element={<GoodbyeScreen />}
 />
 
-      {/* Observer portal — guardian role only */}
       {/* Observer portal — guardian role only */}
 <Route
   path="/observer"

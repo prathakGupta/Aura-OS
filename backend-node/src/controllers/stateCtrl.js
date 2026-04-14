@@ -25,7 +25,7 @@ export const initSessionHandler = async (req, res) => {
     ? providedId.trim()
     : uuidv4();
 
-  const user = await UserState.findOrCreate(userId);
+  const user = await UserState.findOrCreate(userId, { incrementSession: true });
 
   res.json({
     success: true,
@@ -67,6 +67,11 @@ export const getStateHandler = async (req, res) => {
   ).length;
 
   const activeTask = (user.taskHistory || []).find((t) => t.status === 'active');
+  const activeTaskProgress = activeTask
+    ? (Number(activeTask.totalQuests) > 0
+      ? Math.round((Number(activeTask.questsCompleted || 0) / Number(activeTask.totalQuests)) * 100)
+      : 0)
+    : 0;
 
   res.json({
     success: true,
@@ -82,9 +87,7 @@ export const getStateHandler = async (req, res) => {
       ? {
           id: activeTask.id,
           originalTask: activeTask.originalTask,
-          progress: Math.round(
-            (activeTask.questsCompleted / activeTask.totalQuests) * 100
-          ),
+          progress: activeTaskProgress,
           currentQuest: activeTask.microquests.find((q) => !q.completed) || null,
         }
       : null,

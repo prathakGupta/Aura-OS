@@ -76,6 +76,10 @@ export const completeQuestHandler = async (req, res) => {
   const { userId, taskId, questId } = req.body;
   if (!userId || !taskId || questId === undefined)
     throw new AppError('userId, taskId, and questId are required.', 400);
+  const normalizedQuestId = Number(questId);
+  if (!Number.isInteger(normalizedQuestId) || normalizedQuestId < 1) {
+    throw new AppError('questId must be a positive integer.', 400);
+  }
 
   const user = await UserState.findOne({ userId });
   if (!user) throw new AppError('User not found.', 404);
@@ -83,8 +87,8 @@ export const completeQuestHandler = async (req, res) => {
   const task = user.taskHistory.find(t => t.id === taskId);
   if (!task) throw new AppError('Task not found.', 404);
 
-  const quest = task.microquests.find(q => q.id === questId);
-  if (!quest) throw new AppError(`Quest ${questId} not found.`, 404);
+  const quest = task.microquests.find(q => Number(q.id) === normalizedQuestId);
+  if (!quest) throw new AppError(`Quest ${normalizedQuestId} not found.`, 404);
   if (quest.completed) throw new AppError('Quest already completed.', 409);
 
   quest.completed  = true;
@@ -95,6 +99,7 @@ export const completeQuestHandler = async (req, res) => {
   if (allDone) { task.status = 'completed'; task.completedAt = new Date(); }
 
   // 🌟 Log executive function event
+  user.ensureClinicalTelemetry?.();
   user.clinicalTelemetry.executiveFunction.push({
     taskId,
     taskSummary: task.originalTask.slice(0, 100),
@@ -105,15 +110,19 @@ export const completeQuestHandler = async (req, res) => {
   await user.save();
 
   const nextQuest = task.microquests.find(q => !q.completed) || null;
+  const progress = task.totalQuests > 0
+    ? Math.round((task.questsCompleted / task.totalQuests) * 100)
+    : 0;
+
   res.json({
     success:         true,
-    questId,
+    questId: normalizedQuestId,
     taskComplete:    allDone,
     questsCompleted: task.questsCompleted,
     totalQuests:     task.totalQuests,
-    progress:        Math.round((task.questsCompleted / task.totalQuests) * 100),
+    progress,
     nextQuest,
-    message:         allDone ? '🎉 Task fully shattered!' : `Quest ${questId} done.`,
+    message:         allDone ? '🎉 Task fully shattered!' : `Quest ${normalizedQuestId} done.`,
   });
 };
 
@@ -129,6 +138,7 @@ export const abandonTaskHandler = async (req, res) => {
   if (task && task.status === 'active') {
     task.status = 'abandoned';
     // 🌟 Log executive function abandonment
+    user.ensureClinicalTelemetry?.();
     user.clinicalTelemetry.executiveFunction.push({
       taskId,
       taskSummary: task.originalTask.slice(0, 100),

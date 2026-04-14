@@ -1,7 +1,17 @@
-const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
-const CLINICAL = `${BASE}/api/clinical`;
+const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+const CLINICAL = `${baseUrl}/api/clinical`;
 const AI_TIMEOUT = 30_000;
 const API_TIMEOUT = 8_000;
+
+const parseJsonSafe = async (res) => {
+  const raw = await res.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { error: raw.slice(0, 300) || null };
+  }
+};
 
 const req = async (method, path, body, timeoutMs = API_TIMEOUT, token = null) => {
   const ctrl = new AbortController();
@@ -17,9 +27,10 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT, token = null) =>
       signal: ctrl.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const json = await res.json();
-    if (!res.ok || !json.success)
+    const json = await parseJsonSafe(res);
+    if (!res.ok || !json.success) {
       throw new Error(json.error || `Request failed (${res.status})`);
+    }
     return json;
   } catch (err) {
     if (err.name === "AbortError")

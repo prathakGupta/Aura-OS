@@ -121,6 +121,7 @@ export const triggerAlertHandler = async (req, res, next) => {
       || (resolvedArousal >= 8 ? 'high_anxiety' : resolvedArousal >= 5 ? 'mild_anxiety' : 'calm');
 
     const user = await UserState.findOrCreate(userId);
+    user.ensureClinicalTelemetry?.();
 
     if (guardianPhone || guardianName || guardianRelation || alertPreference) {
       user.guardian = {
@@ -242,6 +243,7 @@ export const logVocalStressHandler = async (req, res, next) => {
     if (!userId) throw new AppError('userId is required.', 400);
 
     const user = await UserState.findOrCreate(userId);
+    user.ensureClinicalTelemetry?.();
     user.clinicalTelemetry.vocalStressEvents.push({ emotion, arousalScore, taskContext });
     await user.save();
 
@@ -303,11 +305,15 @@ export const getDashboardMetricsHandler = async (req, res, next) => {
     const { userId } = req.params;
     const { days = 7 } = req.query;
     if (!userId) throw new AppError('userId is required.', 400);
+    const parsedDays = Number(days);
+    const safeDays = Number.isFinite(parsedDays)
+      ? Math.min(30, Math.max(1, Math.floor(parsedDays)))
+      : 7;
 
     const user = await UserState.findOne({ userId }).lean();
     if (!user) return res.json({ success: true, empty: true });
 
-    const since    = new Date(Date.now() - Number(days) * 24 * 60 * 60 * 1000);
+    const since    = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
     const telemetry = user.clinicalTelemetry || {};
 
     // ── Vocal Stress Index (daily average) ──────────────────────────────────
@@ -609,7 +615,9 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
 function _groupByDay(events, valueFn, key) {
   const map = {};
   events.forEach(e => {
-    const day = new Date(e.timestamp).toISOString().split('T')[0];
+    const dt = new Date(e.timestamp);
+    if (Number.isNaN(dt.getTime())) return;
+    const day = dt.toISOString().split('T')[0];
     if (!map[day]) map[day] = { day, sum: 0, count: 0 };
     map[day].sum += valueFn(e);
     map[day].count += 1;
@@ -622,7 +630,9 @@ function _groupByDay(events, valueFn, key) {
 function _groupByDayRatio(events, key) {
   const map = {};
   events.forEach(e => {
-    const day = new Date(e.timestamp).toISOString().split('T')[0];
+    const dt = new Date(e.timestamp);
+    if (Number.isNaN(dt.getTime())) return;
+    const day = dt.toISOString().split('T')[0];
     if (!map[day]) map[day] = { day, completed: 0, total: 0 };
     map[day].total += 1;
     if (e.status === 'completed') map[day].completed += 1;
