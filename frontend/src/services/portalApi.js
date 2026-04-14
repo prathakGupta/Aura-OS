@@ -1,25 +1,29 @@
-// src/services/portalApi.js  🌟 NEW
-// API calls for Observer Portal and Clinical features.
-
-const BASE        = '/api/clinical';
-const AI_TIMEOUT  = 30_000;
+const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
+const CLINICAL = `${BASE}/api/clinical`;
+const AI_TIMEOUT = 30_000;
 const API_TIMEOUT = 8_000;
 
-const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
-  const ctrl  = new AbortController();
+const req = async (method, path, body, timeoutMs = API_TIMEOUT, token = null) => {
+  const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   try {
-    const res  = await fetch(`${BASE}${path}`, {
+    const res = await fetch(`${CLINICAL}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: ctrl.signal,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const json = await res.json();
-    if (!res.ok || !json.success) throw new Error(json.error || `Request failed (${res.status})`);
+    if (!res.ok || !json.success)
+      throw new Error(json.error || `Request failed (${res.status})`);
     return json;
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Request timed out — the AI is generating your report.');
+    if (err.name === "AbortError")
+      throw new Error("Request timed out — the AI is generating your report.");
     throw err;
   } finally {
     clearTimeout(timer);
@@ -27,19 +31,20 @@ const req = async (method, path, body, timeoutMs = API_TIMEOUT) => {
 };
 
 export const clinicalApi = {
-  // Called on "too overwhelming" selection in TaskShatter
-  triggerAlert:    (body)     => req('POST', '/trigger-alert',  body, AI_TIMEOUT),
+  triggerAlert: (body, token) =>
+    req("POST", "/trigger-alert", body, AI_TIMEOUT, token),
 
-  // Full session report generation + optional guardian dispatch
-  sessionReport:   (body)     => req('POST', '/session-report', body, AI_TIMEOUT),
-  reportPdfUrl:    (reportId) => `${BASE}/session-report/${reportId}/pdf`,
+  sessionReport: (body, token) =>
+    req("POST", "/session-report", body, AI_TIMEOUT, token),
 
-  // Guardian setup
-  setGuardian:     (body)     => req('POST', '/guardian',       body),
+  reportPdfUrl: (reportId) => `${CLINICAL}/session-report/${reportId}/pdf`,
 
-  // Observer Portal data (recharts-ready)
-  getDashboard:    (userId, days = 7) => req('GET', `/dashboard/${userId}?days=${days}`, null, API_TIMEOUT),
+  setGuardian: (body, token) =>
+    req("POST", "/guardian", body, API_TIMEOUT, token),
 
-  // 14-day therapy brief
-  therapyBrief:    (userId)   => req('POST', '/therapy-brief', { userId }, AI_TIMEOUT),
+  getDashboard: (userId, days = 7, token = null) =>
+    req("GET", `/dashboard/${userId}?days=${days}`, null, API_TIMEOUT, token),
+
+  therapyBrief: (userId, token = null) =>
+    req("POST", "/therapy-brief", { userId }, AI_TIMEOUT, token),
 };
