@@ -185,7 +185,48 @@ export const buildClinicalReportPdfBuffer = async (report) => {
     clamp(report.aiStressSummary, 1400) || 'AI summary unavailable for this session.');
   writeSectionDivider(doc);
 
-  // ── Section 7: Guardian Contact ───────────────────────────────────────────
+  // ── Section 7: Clinical Recovery Protocol (Diet & Exercise) ──────────────
+  if (report.recoveryProtocol) {
+    const p = report.recoveryProtocol;
+    doc.font('Helvetica-Bold').fontSize(11.5).fillColor('#0f172a').text(`${sectionNum + 1}. Clinical Recovery Protocol`, { align: 'left' });
+    doc.moveDown(0.2);
+
+    // Diagnosis
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e40af').text('Primary Assessment: ', { continued: true });
+    doc.font('Helvetica').fillColor('#374151').text(clamp(p.diagnosis_baseline, 400));
+    doc.moveDown(0.2);
+
+    // Diet
+    const diets = Array.isArray(p.neuro_diet_plan) ? p.neuro_diet_plan : [];
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#15803d').text('Neuro-Dietary Protocol:');
+    if (diets.length) {
+      doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(bullets(diets), { lineGap: 1.5 });
+    } else {
+      doc.font('Helvetica').fontSize(9.5).fillColor('#6b7280').text('No specific dietary protocol generated.');
+    }
+    doc.moveDown(0.4);
+
+    // Somatic Exercise
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#b91c1c').text('Somatic / Exercise Regimen:');
+    doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(clamp(p.somatic_exercise_plan, 500) || 'No specific exercise recommended.', { lineGap: 1.5 });
+    doc.moveDown(0.4);
+
+    // Confidence Anchor
+    if (p.confidence_anchor) {
+      doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#0f172a').text('Confidence Anchor: ', { continued: true });
+      doc.font('Helvetica').fillColor('#4b5563').text(clamp(p.confidence_anchor, 400));
+    }
+    
+    // Disclaimer
+    const disclaimer = clamp(p.medical_disclaimer, 300) || 'AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms.';
+    doc.moveDown(0.4);
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#9ca3af').text(`* ${disclaimer}`);
+    
+    doc.moveDown(0.8);
+    writeSectionDivider(doc);
+  }
+
+  // ── Section 8: Guardian Contact ───────────────────────────────────────────
   const gLine    = report.guardian?.name
     ? `${clamp(report.guardian.name, 80)} | ${clamp(report.guardian.relation, 60) || 'relation N/A'}`
     : 'Guardian details not on file';
@@ -193,7 +234,8 @@ export const buildClinicalReportPdfBuffer = async (report) => {
     ? [report.guardian.phone, report.guardian.email].filter(Boolean).map(s => clamp(s, 120)).join('  |  ')
     : 'No contact details';
 
-  writeSection(doc, `${sectionNum + 1}. Guardian Contact`, `${gLine}\n${cLine}`);
+  const guardianSectionNum = report.recoveryProtocol ? sectionNum + 2 : sectionNum + 1;
+  writeSection(doc, `${guardianSectionNum}. Guardian Contact`, `${gLine}\n${cLine}`);
 
   // ── Footer ────────────────────────────────────────────────────────────────
   doc.moveDown(1);

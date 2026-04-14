@@ -1,174 +1,76 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+// src/services/forgeExtractor.js (Groq Engine)
 
-// Lazily initialise so missing API keys don't crash import at startup.
-let genAI = null;
+import OpenAI from 'openai';
+
+let aiClient = null;
 
 const getClient = () => {
-  if (!genAI) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY is not set in environment variables.');
+  if (!aiClient) {
+    const apiKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('API_KEY is not set in environment variables.');
     }
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    aiClient = new OpenAI({
+      baseURL: process.env.GROQ_API_KEY ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1',
+      apiKey: apiKey,
+    });
   }
-  return genAI;
+  return aiClient;
 };
-
-const DEFAULT_MODEL_CANDIDATES = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash',
-];
 
 const FORGE_SYSTEM_INSTRUCTION = `You are a cognitive extraction engine embedded in a mental health app called AuraOS.
 Your sole job is to read messy, anxious, stream-of-consciousness text and extract each distinct worry.
 
 RULES - follow these exactly:
-1. Return ONLY a valid JSON array. No markdown fences, no explanation, no preamble.
-2. Each item: {"id": <1-based integer>, "worry": "<concise 3-8 word label>", "weight": <1-10>}
-3. weight = emotional urgency/distress level (10 = most overwhelming, 1 = minor).
-4. Combine duplicate or very similar worries into one entry.
-5. Maximum 10 items. If there are more, surface the highest-weight ones.
-6. Do not invent worries that are not implied by the text.
-7. Keep "worry" labels short enough to fit on a physics block - max 8 words.
-8. If the text contains no worries, return an empty array: []
-
-Example input: "I'm so behind on my project and also my mom is sick and I forgot to pay rent again and honestly I don't even know if I'm good enough for this job"
-Example output: [{"id":1,"worry":"project deadline slipping","weight":8},{"id":2,"worry":"mom's health","weight":9},{"id":3,"worry":"missed rent payment","weight":6},{"id":4,"worry":"job competence doubts","weight":7}]`;
-
-const buildModelCandidates = () => {
-  const envModel = (process.env.GEMINI_MODEL || '').trim();
-  const candidates = envModel
-    ? [envModel, ...DEFAULT_MODEL_CANDIDATES]
-    : [...DEFAULT_MODEL_CANDIDATES];
-  return [...new Set(candidates)];
-};
-
-const isModelNotFoundError = (err) => {
-  const message = String(err?.message || '');
-  return err?.status === 404
-    || message.includes('[404')
-    || message.includes('is not found for API version')
-    || message.includes('not supported for generateContent');
-};
+1. Return ONLY valid JSON in this exact format: { "worries": [ { "id": 1, "worry": "short string", "weight": 5 } ] }
+2. weight = emotional urgency/distress level (10 = most overwhelming, 1 = minor).
+3. Combine duplicate or very similar worries into one entry.
+4. Maximum 10 items.
+5. Keep "worry" labels short enough to fit on a physics block - max 8 words.
+6. If the text contains no worries, return { "worries": [] }`;
 
 const localFallbackExtraction = (rawText) => {
-  // Temporary resilience path for demos/testing when model availability is flaky.
-  const segments = rawText
-    .split(/[,.!?;\n]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-
+  const segments = rawText.split(/[,.!?;\n]+/).map((s) => s.trim()).filter(Boolean);
   const worries = segments.slice(0, 6).map((segment, idx) => {
     const short = segment.split(/\s+/).slice(0, 8).join(' ');
     const hasStressWords = /(can't|cannot|worried|anxious|stress|deadline|rent|money|health|afraid|panic)/i.test(segment);
-    return {
-      id: idx + 1,
-      worry: short || 'general worry',
-      weight: hasStressWords ? 7 : 5,
-    };
+    return { id: idx + 1, worry: short || 'general worry', weight: hasStressWords ? 7 : 5 };
   });
-
-  if (!worries.length) {
-    return [{ id: 1, worry: 'general overwhelm', weight: 5 }];
-  }
-
-  return worries;
+  return worries.length ? worries : [{ id: 1, worry: 'general overwhelm', weight: 5 }];
 };
 
-const parseWorries = (responseText) => {
-  const cleaned = responseText
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim();
-
-  let worries;
-  try {
-    worries = JSON.parse(cleaned);
-  } catch {
-    console.error('[Gemini] Failed to parse response as JSON:', cleaned);
-    throw new Error('AI returned malformed JSON. Please try again.');
-  }
-
-  if (!Array.isArray(worries)) {
-    throw new Error('AI returned unexpected data shape (expected array).');
-  }
-
-  return worries.map((item, idx) => ({
-    id: item.id ?? idx + 1,
-    worry: String(item.worry || 'unnamed worry').slice(0, 100),
-    weight: Math.min(10, Math.max(1, Number(item.weight) || 5)),
-  }));
-};
-
-/**
- * Extracts worries from a free-form text input.
- * @param {string} rawText - The user's unstructured worry paragraph.
- * @returns {Promise<Array<{id: number, worry: string, weight: number}>>}
- */
 export const extractWorries = async (rawText) => {
-  if (!rawText || rawText.trim().length < 3) {
-    return [];
+  if (!rawText || rawText.trim().length < 3) return [];
+
+  let client;
+  try {
+    client = getClient();
+  } catch (err) {
+    console.error(`[ForgeExtractor] Client init failed: ${err.message}`);
+    console.warn('[ForgeExtractor] Falling back to local extractor.');
+    return localFallbackExtraction(rawText);
   }
+
+  const modelName = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+  console.log(`[ForgeExtractor] Extracting worries using ${modelName}...`);
 
   try {
-    const client = getClient();
-    const modelCandidates = buildModelCandidates();
+    const response = await client.chat.completions.create({
+      model: modelName,
+      messages: [
+        { role: "system", content: FORGE_SYSTEM_INSTRUCTION },
+        { role: "user", content: rawText }
+      ],
+      temperature: 0.2,
+      response_format: { type: 'json_object' } 
+    });
 
-    console.log(`[Gemini] Extracting worries from text (${rawText.length} chars)...`);
+    const parsed = JSON.parse(response.choices.message.content);
+    return parsed.worries || [];
 
-    let lastError = null;
-
-    for (const modelName of modelCandidates) {
-      try {
-        console.log(`[Gemini] Trying model: ${modelName}`);
-        const model = client.getGenerativeModel({
-          model: modelName,
-          systemInstruction: FORGE_SYSTEM_INSTRUCTION,
-          generationConfig: {
-            temperature: 0.2,
-            topP: 0.8,
-            maxOutputTokens: 1024,
-          },
-        });
-
-        const result = await model.generateContent(rawText);
-        
-        // Resilience: text() can throw if safety filters block the response
-        let responseText;
-        try {
-          responseText = result.response.text().trim();
-        } catch (safetyErr) {
-          console.warn(`[Gemini] Model ${modelName} safety block:`, safetyErr.message);
-          continue; // Try next model or fallback
-        }
-
-        console.log(`[Gemini] Raw response (${modelName}): ${responseText.substring(0, 200)}`);
-        return parseWorries(responseText);
-      } catch (err) {
-        lastError = err;
-        console.warn(`[Gemini] Model ${modelName} failed:`, err.message);
-        
-        // If it's a 404/not-found, we try next.
-        // For 429 (Quota), we try next too, though likely all will fail.
-        // The key is to NOT throw, so we eventually hit the fallback.
-        if (isModelNotFoundError(err) || err.status === 429 || err.message.includes('429')) {
-          continue;
-        }
-        
-        // For other unexpected errors, try next model as well
-        continue;
-      }
-    }
-
-    if (lastError) {
-      console.warn('[Gemini] All models failed. Last error:', lastError.message);
-    }
-  } catch (initErr) {
-    console.warn('[Gemini] AI Client initialization failed:', initErr.message);
+  } catch (err) {
+    console.error(`[ForgeExtractor] Extraction failed: ${err.message}`);
+    console.warn('[ForgeExtractor] Falling back to local extractor.');
+    return localFallbackExtraction(rawText);
   }
-
-  console.warn('[Gemini] Falling back to local rule-based extractor for reliability.');
-  return localFallbackExtraction(rawText);
 };
-

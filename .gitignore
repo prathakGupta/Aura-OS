@@ -54,3 +54,17 @@ Thumbs.db
 *.swo
 !*.env.example
 !**/.env.example
+
+# ── Datasets ───────────────────────────────────────────────────
+dataset/
+datasets/
+
+# ── ML Training Artifacts ──────────────────────────────────────
+# Ignore intermediate checkpoints but keep production models
+backend-python/training/checkpoints/
+*.ckpt
+*.h5
+# *.pt  # Commented out to allow production models like wav2vec2_emotion.pt if desired
+
+# Large ML Model files (Excluded due to GitHub limits on large clones/forks)
+backend-python/models/wav2vec2_emotion.pt

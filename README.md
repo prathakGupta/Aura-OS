@@ -94,7 +94,7 @@ A personalized, scientifically-backed recovery system engineered for users needi
 | Backend AI orchestration | LangChain + Groq | `withStructuredOutput` = validated JSON guaranteed |
 | Worry extraction | Google Gemini Flash | Long context + fast for stream-of-consciousness text |
 | Database | MongoDB Atlas | Flexible schema for evolving worry/task models |
-| Audio ML | FastAPI + Whisper + librosa | Low-latency Python pipeline, isolated from Node |
+| Audio ML | FastAPI + Whisper + XGBoost + RF | GPU-accelerated ensemble ML pipeline |
 | TTS | ElevenLabs | Emotionally nuanced voice output |
 
 ---

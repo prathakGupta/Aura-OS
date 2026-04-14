@@ -41,6 +41,17 @@ const GameSessionSchema = new mongoose.Schema(
   { _id:false }
 );
 
+const RecoveryProtocolSchema = new mongoose.Schema(
+  {
+    diagnosis_baseline: { type:String, default:'' },
+    neuro_diet_plan:    { type:[String], default:[] },
+    somatic_exercise_plan: { type:String, default:'' },
+    confidence_anchor:  { type:String, default:'' },
+    medical_disclaimer: { type:String, default:'' }
+  },
+  { _id:false }
+);
+
 const DeliveryStatusSchema = new mongoose.Schema(
   { attempted:{type:Boolean,default:false}, status:{type:String,enum:['sent','failed','mock','skipped'],default:'skipped'}, sid:{type:String,default:null}, error:{type:String,default:null} },
   { _id:false }
@@ -59,6 +70,7 @@ const ClinicalReportSchema = new mongoose.Schema(
     shatteredWorryBlocks:{ type:[ReportWorrySchema],  default:[] },
     timelineMicroquests: { type:[ReportQuestSchema],  default:[] },
     gameSessions:        { type:[GameSessionSchema],  default:[] },   // 🆕 game telemetry
+    recoveryProtocol:    { type:RecoveryProtocolSchema, default:null }, // Diet and exercise protocol
     guardian:            {
       name:     { type:String, default:'' },
       email:    { type:String, default:'' },

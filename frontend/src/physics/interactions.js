@@ -1,6 +1,7 @@
 // src/physics/interactions.js
 // Attaches Matter.js MouseConstraint to the canvas so users can
 // grab and drag worry blocks with their mouse/touch.
+// v2.0 — Snappier grab feel + thicker drag line for visibility
 
 import Matter from 'matter-js';
 
@@ -24,13 +25,13 @@ export const addMouseInteraction = (engine, render, canvas) => {
   const mouseConstraint = MouseConstraint.create(engine, {
     mouse,
     constraint: {
-      stiffness: 0.2,
-      damping: 0.1,
+      stiffness: 0.6,     // snappy grab (was 0.2)
+      damping: 0.08,
       render: {
-        // Show a subtle spring line when dragging
+        // Show a thick visible spring line when dragging
         visible: true,
-        lineWidth: 1,
-        strokeStyle: 'rgba(167,139,250,0.5)', // --purple-light
+        lineWidth: 2.5,
+        strokeStyle: 'rgba(255,107,138,0.65)', // coral drag line
       },
     },
   });

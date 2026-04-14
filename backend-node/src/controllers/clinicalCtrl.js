@@ -18,6 +18,9 @@ import { buildClinicalReportPdfBuffer } from '../services/reportPdf.js';
 import { evaluateBurnoutRisk }   from '../services/triageEngine.js';
 import { AppError }              from '../middleware/errorHandler.js';
 
+// Fallback cache for generating PDFs when MongoDB is offline
+const localMemoryReports = new Map();
+
 const toSafeString = (v, max = 300) => String(v || '').trim().slice(0, max);
 
 const normalizeWorryBlocks = (payloadBlocks = [], dbWorries = []) => {
@@ -94,19 +97,9 @@ const deliveryStatusFromResult = (result) => {
 export const triggerAlertHandler = async (req, res, next) => {
   try {
     const {
-      userId,
-      taskSummary,
-      currentTask,
-      blocker,
-      selectedBlocker,
-      vocalArousal,
-      vocalArousalScore,
-      emotion,
-      recentHistory,
-      guardianPhone,
-      guardianName,
-      guardianRelation,
-      alertPreference,
+      userId, taskSummary, currentTask, blocker, selectedBlocker,
+      vocalArousal, vocalArousalScore, emotion, recentHistory,
+      guardianPhone, guardianName, guardianRelation, alertPreference,
     } = req.body;
 
     if (!userId) throw new AppError('userId is required.', 400);
@@ -114,11 +107,8 @@ export const triggerAlertHandler = async (req, res, next) => {
     const resolvedTaskSummary = String(taskSummary || currentTask || 'an overwhelming task').trim();
     const resolvedBlocker = String(blocker || selectedBlocker || 'too_overwhelming').trim();
     const parsedArousal = Number(vocalArousal ?? vocalArousalScore);
-    const resolvedArousal = Number.isFinite(parsedArousal)
-      ? Math.min(10, Math.max(1, parsedArousal))
-      : 8;
-    const resolvedEmotion = emotion
-      || (resolvedArousal >= 8 ? 'high_anxiety' : resolvedArousal >= 5 ? 'mild_anxiety' : 'calm');
+    const resolvedArousal = Number.isFinite(parsedArousal) ? Math.min(10, Math.max(1, parsedArousal)) : 8;
+    const resolvedEmotion = emotion || (resolvedArousal >= 8 ? 'high_anxiety' : resolvedArousal >= 5 ? 'mild_anxiety' : 'calm');
 
     const user = await UserState.findOrCreate(userId);
     user.ensureClinicalTelemetry?.();
@@ -136,24 +126,16 @@ export const triggerAlertHandler = async (req, res, next) => {
 
     const telemetry = user.clinicalTelemetry || {};
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
     const recentExecEvents = (telemetry.executiveFunction || []).filter((e) => new Date(e.timestamp) > dayAgo);
     const tasksAbandonedToday = recentExecEvents.filter((e) => e.status === 'abandoned').length;
     const recentForgeCount = (telemetry.forgeSessions || []).filter((e) => new Date(e.timestamp) > dayAgo).length;
-
-    const recentExecSummary = recentExecEvents
-      .slice(-8)
-      .map((e) => `${e.status} "${e.taskSummary || 'task'}"`)
-      .join(', ');
+    const recentExecSummary = recentExecEvents.slice(-8).map((e) => `${e.status} "${e.taskSummary || 'task'}"`).join(', ');
 
     const payloadHistory = (recentHistory && typeof recentHistory === 'object') ? recentHistory : null;
     const payloadHistoryParts = [];
-    if (payloadHistory?.tasksAbandonedToday !== undefined)
-      payloadHistoryParts.push(`Frontend signal: ${payloadHistory.tasksAbandonedToday} tasks abandoned today.`);
-    if (payloadHistory?.forgeUsage)
-      payloadHistoryParts.push(`Frontend forge usage: ${payloadHistory.forgeUsage}.`);
-    if (payloadHistory?.selectedBlockerLabel)
-      payloadHistoryParts.push(`Frontend blocker label: ${payloadHistory.selectedBlockerLabel}.`);
+    if (payloadHistory?.tasksAbandonedToday !== undefined) payloadHistoryParts.push(`Frontend signal: ${payloadHistory.tasksAbandonedToday} tasks abandoned today.`);
+    if (payloadHistory?.forgeUsage) payloadHistoryParts.push(`Frontend forge usage: ${payloadHistory.forgeUsage}.`);
+    if (payloadHistory?.selectedBlockerLabel) payloadHistoryParts.push(`Frontend blocker label: ${payloadHistory.selectedBlockerLabel}.`);
 
     const recentPattern = [
       `Past 24h telemetry: ${tasksAbandonedToday} abandoned tasks, ${recentForgeCount} forge sessions.`,
@@ -163,12 +145,20 @@ export const triggerAlertHandler = async (req, res, next) => {
 
     let brief;
     try {
+      const snapshot = req.body.sessionSnapshot || {};
       brief = await generateGuardianBrief({
         userName: userId,
-        taskSummary: resolvedTaskSummary || 'an overwhelming task',
-        blocker: resolvedBlocker || 'too_overwhelming',
+        taskSummary: resolvedTaskSummary,
+        blocker: resolvedBlocker,
         vocalArousal: resolvedArousal,
         emotion: resolvedEmotion,
+        baselineArousalScore: telemetry.baselineArousalScore || snapshot.baselineArousalScore || null,
+        baselineProfile: telemetry.baselineProfile || snapshot.baselineProfile || {},
+        lastKnownActivity: req.body.lastKnownActivity || snapshot.lastKnownActivity || null,
+        worryBlocks: snapshot.worryBlocks || normalizeWorryBlocks([], user.vaultedWorries || []),
+        probeSessions: (telemetry.probeData || []).slice(-5).concat(snapshot.probeSessions || []),
+        questTelemetry: snapshot.questTelemetry || [],
+        gameSessions: snapshot.gameSessions || [],
         auraAction: 'Somatic interruption (5-second breathing exercise) deployed. Brown noise environment activated.',
         recentPatterns: recentPattern,
       });
@@ -178,9 +168,9 @@ export const triggerAlertHandler = async (req, res, next) => {
         subject: 'AuraOS Alert - Stress Spike Detected',
         analogy: 'A computer that has frozen because too many programmes tried to run at once.',
         vocal_analysis: `Vocal arousal detected at ${resolvedArousal}/10 - significantly elevated.`,
-        observed_pattern: `The user attempted "${resolvedTaskSummary}" but reported acute overwhelm. This is consistent with executive dysfunction freeze.`,
+        observed_pattern: `The user attempted "${resolvedTaskSummary}" but reported acute overwhelm. Executive dysfunction freeze pattern.`,
         aura_action_taken: 'A breathing exercise was deployed and a calming audio environment was activated.',
-        parent_action: 'Do not ask about the task for at least 20 minutes. Offer water and a brief walk. Use the phrase: "I see you are working really hard. Let\'s take a break together."',
+        parent_action: 'Offer water and a brief walk. Try: "I see you are working really hard. Let\'s take a break together."',
         risk_level: 'pre-burnout',
       };
     }
@@ -196,12 +186,7 @@ export const triggerAlertHandler = async (req, res, next) => {
 
     const resolvedGuardianPhone = guardianPhone || user.guardian?.phone;
     const channel = alertPreference || user.guardian?.alertPreference || 'whatsapp';
-    const deliveryResult = await sendGuardianAlert({
-      brief,
-      userName: userId,
-      guardianPhone: resolvedGuardianPhone,
-      channel,
-    });
+    const deliveryResult = await sendGuardianAlert({ brief, userName: userId, guardianPhone: resolvedGuardianPhone, channel });
 
     const lastSpike = user.clinicalTelemetry.stressSpikes[user.clinicalTelemetry.stressSpikes.length - 1];
     if (lastSpike) {
@@ -222,13 +207,9 @@ export const triggerAlertHandler = async (req, res, next) => {
     });
 
     res.json({
-      success: true,
-      briefGenerated: true,
-      alertSent: deliveryResult.success,
-      channel: deliveryResult.channel,
-      riskLevel: brief.risk_level,
-      guardianConfigured: Boolean(resolvedGuardianPhone),
-      coachFeedback: brief.analogy,
+      success: true, briefGenerated: true, alertSent: deliveryResult.success,
+      channel: deliveryResult.channel, riskLevel: brief.risk_level,
+      guardianConfigured: Boolean(resolvedGuardianPhone), coachFeedback: brief.analogy,
     });
   } catch (err) {
     next(err);
@@ -247,10 +228,8 @@ export const logVocalStressHandler = async (req, res, next) => {
     user.clinicalTelemetry.vocalStressEvents.push({ emotion, arousalScore, taskContext });
     await user.save();
 
-    // Background triage check (non-blocking)
     evaluateBurnoutRisk(userId).then(async (risk) => {
       if (risk.atRisk && risk.riskLevel === 'acute-distress') {
-        // Auto-alert without user intervention for severe cases
         console.log(`[Triage] Auto-alert triggered for ${userId}: ${risk.riskLevel}`);
       }
     }).catch(() => {});
@@ -260,6 +239,7 @@ export const logVocalStressHandler = async (req, res, next) => {
     next(err);
   }
 };
+
 
 // ── POST /api/clinical/guardian ───────────────────────────────────────────────
 // Set or update the guardian contact for this user.
@@ -430,10 +410,16 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
     if (!userId) throw new AppError('userId is required.', 400);
 
-    const user = await UserState.findOrCreate(userId);
-    const activeTask = taskId
-      ? (user.taskHistory || []).find((t) => t.id === taskId)
-      : (user.taskHistory || []).find((t) => t.status === 'active');
+    let user = {};
+    let activeTask = null;
+    try {
+      user = await UserState.findOrCreate(userId);
+      activeTask = taskId
+        ? (user.taskHistory || []).find((t) => t.id === taskId)
+        : (user.taskHistory || []).find((t) => t.status === 'active');
+    } catch (dbErr) {
+      console.warn('[Clinical] DB unavailable. Bypassing user lookup for report.', dbErr.message);
+    }
 
     const resolvedTask = toSafeString(
       currentTask || activeTask?.originalTask || sessionSnapshot?.currentTask || '',
@@ -478,7 +464,21 @@ export const generateSessionReportHandler = async (req, res, next) => {
       }
     }
 
-    const report = await ClinicalReport.create({
+    let recoveryProtocol = sessionSnapshot?.recoveryProtocol || null;
+    if (!recoveryProtocol) {
+      try {
+        recoveryProtocol = await generateRecoveryProtocol({
+          status: "Snapshot Context Recovery Protocol",
+          taskSummary: resolvedTask,
+          vocalArousal: resolvedArousal,
+          emotion: resolvedArousal >= 8 ? 'high_anxiety' : 'mild_anxiety',
+        });
+      } catch (err) {
+        console.warn('[Clinical] Recovery protocol inline generation failed', err.message);
+      }
+    }
+
+    const draftReport = {
       userId,
       source: ['panic', 'manual', 'auto'].includes(source) ? source : 'manual',
       currentTask: resolvedTask,
@@ -492,6 +492,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
       shatteredWorryBlocks: normalizeWorryBlocks(sessionSnapshot?.shatteredWorryBlocks, user.vaultedWorries || []),
       timelineMicroquests: normalizeTimeline(sessionSnapshot?.timelineMicroquests, activeTask || null),
       gameSessions: Array.isArray(sessionSnapshot?.gameSessions) ? sessionSnapshot.gameSessions : [],
+      recoveryProtocol,
       guardian: {
         name: toSafeString(user.guardian?.name, 120),
         email: toSafeString(user.guardian?.email, 200),
@@ -503,9 +504,21 @@ export const generateSessionReportHandler = async (req, res, next) => {
         generatedAt: new Date(),
         gameSessions: Array.isArray(sessionSnapshot?.gameSessions) ? sessionSnapshot.gameSessions : [],
       },
-    });
+    };
 
-    const downloadUrl = buildPublicReportUrl(req, report._id.toString());
+    let report = draftReport;
+    let fallbackReportId = `local-${Date.now()}`;
+    try {
+      // Create via Mongoose if online
+      report = await ClinicalReport.create(draftReport);
+      report._id = report._id.toString();
+    } catch (dbErr) {
+      console.warn('[Clinical] Mongoose offline. Keeping report in memory for PDF generation.');
+      report._id = fallbackReportId;
+      localMemoryReports.set(fallbackReportId, report);
+    }
+
+    const downloadUrl = buildPublicReportUrl(req, report._id);
     const pdfBuffer = await buildClinicalReportPdfBuffer(report);
 
     let whatsappResult = { skipped: true, channel: 'whatsapp' };
@@ -520,7 +533,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
 
       const mediaBase = process.env.TWILIO_MEDIA_PUBLIC_BASE_URL || process.env.REPORT_PUBLIC_BASE_URL || null;
       const mediaUrl = mediaBase
-        ? `${mediaBase.replace(/\/$/, '')}/api/clinical/session-report/${report._id.toString()}/pdf`
+        ? `${mediaBase.replace(/\/$/, '')}/api/clinical/session-report/${report._id}/pdf`
         : null;
 
       const [waSettled, emailSettled] = await Promise.allSettled([
@@ -539,7 +552,7 @@ export const generateSessionReportHandler = async (req, res, next) => {
               guardianName: report.guardian?.name,
               userId,
               riskLevel: report.riskLevel,
-              reportId: report._id.toString(),
+              reportId: report._id,
               summary: report.aiStressSummary,
               downloadUrl,
               pdfBuffer,
@@ -555,30 +568,41 @@ export const generateSessionReportHandler = async (req, res, next) => {
         ? emailSettled.value
         : { success: false, channel: 'email', error: emailSettled.reason?.message || 'Email dispatch failed' };
 
-      await AlertLog.create({
-        userId,
-        guardianPhone: report.guardian?.phone || null,
-        guardianEmail: report.guardian?.email || null,
-        channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
-        riskLevel: report.riskLevel,
-        triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
-        briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
-        deliveryStatus: whatsappResult.success || emailResult.success
-          ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
-          : 'failed',
-        twilioSid: whatsappResult.sid || null,
-      });
+      try {
+        await AlertLog.create({
+          userId,
+          guardianPhone: report.guardian?.phone || null,
+          guardianEmail: report.guardian?.email || null,
+          channel: whatsappResult.mock ? 'mock' : (whatsappResult.success ? 'whatsapp' : (emailResult.success ? 'email' : 'mock')),
+          riskLevel: report.riskLevel,
+          triggerReason: `${report.selectedBlocker || 'stress'} during "${report.currentTask || 'session'}"`,
+          briefText: [brief.observed_pattern, brief.parent_action].join('\n\n').slice(0, 3000),
+          deliveryStatus: whatsappResult.success || emailResult.success
+            ? (whatsappResult.mock && emailResult.mock ? 'mock' : 'sent')
+            : 'failed',
+          twilioSid: whatsappResult.sid || null,
+        });
+      } catch (dbErr) {
+        console.warn('[Clinical] AlertLog.create skipped (DB offline)');
+      }
     }
 
     report.delivery = {
       whatsapp: deliveryStatusFromResult(whatsappResult),
       email: deliveryStatusFromResult(emailResult),
     };
-    await report.save();
+    
+    try {
+      if (typeof report.save === 'function') {
+        await report.save();
+      }
+    } catch(e) {
+      console.warn('[Clinical] report.save skipped (DB offline)');
+    }
 
     res.json({
       success: true,
-      reportId: report._id.toString(),
+      reportId: report._id,
       riskLevel: report.riskLevel,
       aiStressSummary: report.aiStressSummary,
       downloadUrl,
@@ -596,15 +620,29 @@ export const downloadSessionReportPdfHandler = async (req, res, next) => {
     const { reportId } = req.params;
     if (!reportId) throw new AppError('reportId is required.', 400);
 
-    const report = await ClinicalReport.findById(reportId).lean();
-    if (!report) throw new AppError('Report not found.', 404);
+    let report = null;
+    if (reportId.startsWith('local-')) {
+      report = localMemoryReports.get(reportId);
+    } else {
+      try {
+        report = await ClinicalReport.findById(reportId).lean();
+      } catch (dbErr) {
+        console.warn(`[Clinical] Mongoose findById failed for ${reportId} or offline.`);
+      }
+    }
+
+    if (!report) throw new AppError('Report not found or expired from local memory.', 404);
 
     const pdfBuffer = await buildClinicalReportPdfBuffer(report);
 
-    await ClinicalReport.updateOne(
-      { _id: reportId },
-      { $inc: { 'meta.pdfDownloads': 1 } }
-    );
+    if (!reportId.startsWith('local-')) {
+      try {
+        await ClinicalReport.updateOne(
+          { _id: reportId },
+          { $inc: { 'meta.pdfDownloads': 1 } }
+        );
+      } catch (e) {}
+    }
 
     const filename = `AuraOS-Clinical-Report-${report.userId || 'user'}-${reportId}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');

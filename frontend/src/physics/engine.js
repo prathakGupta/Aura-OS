@@ -1,18 +1,19 @@
 // src/physics/engine.js
 // Initialises the Matter.js world for the Cognitive Forge canvas.
-// Returns engine, render, runner, and the world reference.
+// v2.0 — Shelf staging area + confetti destruction + brutalist text rendering
 
 import Matter from 'matter-js';
+import confetti from 'canvas-confetti';
 
 const { Engine, Render, Runner, World, Bodies, Events } = Matter;
 
 // Weight (1-10) → block width in pixels
 export const weightToWidth  = (w) => 90 + w * 18;
-// Weight → fill color (low = cool blue, high = hot red)
+// Brutalist dark fills — heavy and aggressive
 export const weightToColor  = (w) => {
-  if (w >= 8) return '#f43f5e';   // coral – high urgency
-  if (w >= 5) return '#f59e0b';   // amber – medium
-  return '#7c3aed';               // purple – lower
+  if (w >= 8) return '#dc2626';   // red – high urgency
+  if (w >= 5) return '#d97706';   // amber – medium
+  return '#6d28d9';               // purple – lower
 };
 
 /**
@@ -28,7 +29,7 @@ export const initEngine = (canvas, onBlockDestroyed) => {
   const W = canvas.width;
   const H = canvas.height;
 
-  const engine = Engine.create({ gravity: { x: 0, y: 0.8 } });
+  const engine = Engine.create({ gravity: { x: 0, y: 1.2 } }); // heavier gravity
   const { world } = engine;
 
   const render = Render.create({
@@ -51,9 +52,24 @@ export const initEngine = (canvas, onBlockDestroyed) => {
     Bodies.rectangle(W + 25, H / 2, 50, H, wallOpts),  // right wall
   ]);
 
+  // ── Safe Shelf (staging area) ─────────────────────────────────────────────
+  // Blocks land here and SIT. Users must drag them off to drop into fire.
+  const shelfY = Math.round(H * 0.55);
+  const shelfW = W - 100;
+  const shelf = Bodies.rectangle(W / 2, shelfY, shelfW, 10, {
+    isStatic: true,
+    label: 'shelf',
+    render: {
+      fillStyle: 'rgba(255,255,255,0.08)',
+      strokeStyle: 'rgba(255,255,255,0.18)',
+      lineWidth: 1,
+    },
+  });
+  World.add(world, shelf);
+
   // ── Fireplace sensor ───────────────────────────────────────────────────────
   // Invisible sensor; the visual fireplace is drawn in React DOM
-  const fireplace = Bodies.rectangle(W / 2, H - 14, W - 80, 28, {
+  const fireplace = Bodies.rectangle(W / 2, H - 14, W - 80, 36, {
     isStatic: true,
     isSensor: true,
     label: 'fireplace',
@@ -61,37 +77,60 @@ export const initEngine = (canvas, onBlockDestroyed) => {
   });
   World.add(world, fireplace);
 
-  // ── Collision: block enters fireplace → destroy it ─────────────────────────
+  // ── Collision: block enters fireplace → confetti + destroy ─────────────────
   Events.on(engine, 'collisionStart', ({ pairs }) => {
     pairs.forEach(({ bodyA, bodyB }) => {
       const block =
         bodyA.label === 'fireplace' ? bodyB :
         bodyB.label === 'fireplace' ? bodyA : null;
 
-      if (block && block.label !== 'fireplace' && block.label !== 'wall') {
+      if (block && block.label !== 'fireplace' && block.label !== 'wall' && block.label !== 'shelf') {
+        // Explosion confetti at the block's position
+        const canvasRect = canvas.getBoundingClientRect();
+        const bx = (canvasRect.left + block.position.x) / window.innerWidth;
+        const by = (canvasRect.top + block.position.y) / window.innerHeight;
+        confetti({
+          particleCount: 25,
+          spread: 60,
+          origin: { x: Math.min(1, Math.max(0, bx)), y: Math.min(1, Math.max(0, by)) },
+          colors: ['#ff6b8a', '#ffb300', '#c4b5fd', '#00e676'],
+          ticks: 50,
+          gravity: 1.2,
+          scalar: 0.8,
+          startVelocity: 15,
+        });
+
         World.remove(world, block);
         onBlockDestroyed?.(block.worryUuid);
       }
     });
   });
 
-  // ── Custom render: draw worry text on each block ───────────────────────────
+  // ── Custom render: draw worry text on each block (BRUTALIST style) ─────────
   Events.on(render, 'afterRender', () => {
     const ctx = render.context;
 
+    // Draw shelf label
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.font = '600 9px Inter, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('▼ DRAG BLOCKS DOWN TO INCINERATE ▼', W / 2, shelfY + 22);
+    ctx.restore();
+
     world.bodies.forEach((body) => {
-      if (body.label === 'wall' || body.label === 'fireplace' || !body.worryText) return;
+      if (body.label === 'wall' || body.label === 'fireplace' || body.label === 'shelf' || !body.worryText) return;
 
       ctx.save();
       ctx.translate(body.position.x, body.position.y);
       ctx.rotate(body.angle);
 
-      // White text, two lines if needed
-      const text = body.worryText;
-      const maxWidth = body.worryWidth - 24;
+      // BRUTALIST: bold uppercase white text
+      const text = body.worryText.toUpperCase();
+      const maxWidth = body.worryWidth - 16;
 
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.font = '500 12px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.font = '900 13px Inter, monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 

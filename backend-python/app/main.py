@@ -20,6 +20,7 @@ from app.api.routes_audio import router as audio_router
 from app.api.routes_tasks import router as tasks_router
 from app.api.routes_triage import router as triage_router
 from app.api.routes_rag import router as rag_router
+from app.api.routes_behavioral import router as behavioral_router
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.core.config import settings
 
@@ -50,6 +51,7 @@ app.include_router(audio_router, tags=["Audio"])
 app.include_router(tasks_router, prefix="/api/v1/ai", tags=["LangChain Logic"])
 app.include_router(triage_router, prefix="/api/v1/triage", tags=["Triage System"])
 app.include_router(rag_router, prefix="/api/v1/rag", tags=["Clinical RAG"])
+app.include_router(behavioral_router, prefix="/api/v1/behavioral", tags=["Behavioral Health"])
 
 
 @app.get("/")

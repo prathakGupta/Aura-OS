@@ -121,6 +121,35 @@ const useStore = create((set, get) => ({
   setBaselineAnswer: (key, value) => set((s) => ({ baselineProfile: { ...s.baselineProfile, [key]: value } })),
   addProbeSession: (session) => set((s) => ({ probeSessions: [...s.probeSessions, session] })),
 
+  // ── Master Session Aggregator ─────────────────────────────────
+  // Snapshots ALL telemetry into one JSON blob for the clinical API.
+  // Called by CognitiveForge / TaskShatter before dispatching to backend.
+  generateSessionPayload: (overrides = {}) => {
+    const s = get();
+    const emotionToArousal = { calm: 3, mild_anxiety: 6, high_anxiety: 9 };
+    const task = s.activeTask;
+    return {
+      userId:              s.userId,
+      baselineArousalScore: s.baselineArousalScore,
+      vocalArousalScore:   emotionToArousal[s.auraEmotion] || 5,
+      baselineProfile:     s.baselineProfile,
+      lastKnownActivity:   s.lastKnownActivity,
+      worryBlocks:         s.worries.map(w => ({
+        id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active',
+      })),
+      probeSessions:       s.probeSessions.map(p => ({
+        imageId: p.imageId, firstSeen: p.firstSeen, latencyMs: p.latencyMs,
+        canSwitchPerspective: p.canSwitchPerspective,
+      })),
+      questTelemetry:      s.questTelemetry,
+      activeTask:          task ? {
+        task: task.originalTask, blocker: task.blocker,
+        totalQuests: task.totalQuests, questsCompleted: task.questsCompleted,
+      } : null,
+      ...overrides,
+    };
+  },
+
   setActiveTask: (task) =>
     set({
       activeTask: task,

@@ -68,6 +68,12 @@ class VoiceSession:
                     "emotion": features.emotion,
                     "pitch_score": features.pitch_score,
                     "cadence_score": features.cadence_score,
+                    "arousal_score": getattr(features, 'arousal_score', 5.0),
+                    "confidence": getattr(features, 'confidence', 0.0),
+                    "jitter": getattr(features, 'jitter', 0.0),
+                    "shimmer": getattr(features, 'shimmer', 0.0),
+                    "hnr": getattr(features, 'hnr', 0.0),
+                    "f0_mean": getattr(features, 'f0_mean', 0.0),
                 }
             )
             self.last_emotion = features.emotion
@@ -140,12 +146,20 @@ class VoiceSession:
                 "type": "response",
                 "text": response,
                 "emotion": features.emotion,
+                "arousal_score": getattr(features, 'arousal_score', arousal_score),
+                "confidence": getattr(features, 'confidence', 0.0),
             },
             {
                 "type": "emotion_update",
                 "emotion": features.emotion,
                 "pitch_score": features.pitch_score,
                 "cadence_score": features.cadence_score,
+                "arousal_score": getattr(features, 'arousal_score', arousal_score),
+                "confidence": getattr(features, 'confidence', 0.0),
+                "jitter": getattr(features, 'jitter', 0.0),
+                "shimmer": getattr(features, 'shimmer', 0.0),
+                "hnr": getattr(features, 'hnr', 0.0),
+                "f0_mean": getattr(features, 'f0_mean', 0.0),
             },
         ]
 
