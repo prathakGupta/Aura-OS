@@ -1,4 +1,4 @@
-// src/services/reportPdf.js — v4.0 (Unified React-PDF Engine)
+// src/services/reportPdf.js — v4.1 (Unified React-PDF Engine)
 // Professionally styled reports with embedded Clinical Recovery Protocols.
 
 import React from 'react';
@@ -52,51 +52,47 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', bottom: 24, left: 40, right: 40, fontSize: 7, color: colors.muted, textAlign: 'center' }
 });
 
-// ── Components ───────────────────────────────────────────────────────────────
+// ── Components (Manual createElement for Node compatibility) ──────────────────
 
-const SectionTitle = ({ number, children }) => (
-  <Text style={styles.sectionTitle}>{number}. {children}</Text>
-);
+const SectionTitle = ({ number, children }) => 
+  React.createElement(Text, { style: styles.sectionTitle }, `${number}. `, children);
 
-const InfoRow = ({ label, value }) => (
-  <View style={styles.row}>
-    <Text style={styles.label}>{label}</Text>
-    <Text style={styles.value}>{value || 'N/A'}</Text>
-  </View>
-);
+const InfoRow = ({ label, value }) => 
+  React.createElement(View, { style: styles.row },
+    React.createElement(Text, { style: styles.label }, label),
+    React.createElement(Text, { style: styles.value }, value || 'N/A')
+  );
 
-const Bullet = ({ children }) => (
-  <View style={styles.bulletItem}>
-    <Text style={styles.bulletDot}>  •</Text>
-    <Text style={styles.bulletText}>{children}</Text>
-  </View>
-);
+const Bullet = ({ children }) => 
+  React.createElement(View, { style: styles.bulletItem },
+    React.createElement(Text, { style: styles.bulletDot }, '  •'),
+    React.createElement(Text, { style: styles.bulletText }, children)
+  );
 
 const RecoveryProtocol = ({ protocol }) => {
   if (!protocol) return null;
-  return (
-    <View style={styles.recoveryBox}>
-      <Text style={styles.recoveryTitle}>7. Clinical Recovery Protocol</Text>
-      
-      <Text style={styles.recoverySub}>Primary Assessment:</Text>
-      <Text style={styles.sectionBody}>{protocol.diagnosis_baseline}</Text>
-      
-      <Text style={styles.recoverySub}>Neuro-Dietary Protocol:</Text>
-      {(protocol.neuro_diet_plan || []).map((item, i) => (
-        <Bullet key={i}>{item}</Bullet>
-      ))}
+  return React.createElement(View, { style: styles.recoveryBox },
+    React.createElement(Text, { style: styles.recoveryTitle }, '7. Clinical Recovery Protocol'),
+    
+    React.createElement(Text, { style: styles.recoverySub }, 'Primary Assessment:'),
+    React.createElement(Text, { style: styles.sectionBody }, protocol.diagnosis_baseline),
+    
+    React.createElement(Text, { style: styles.recoverySub }, 'Neuro-Dietary Protocol:'),
+    (protocol.neuro_diet_plan || []).map((item, i) => 
+      React.createElement(Bullet, { key: i }, item)
+    ),
 
-      <Text style={styles.recoverySub}>Somatic Exercise Regimen:</Text>
-      <Text style={styles.sectionBody}>{protocol.somatic_exercise_plan}</Text>
+    React.createElement(Text, { style: styles.recoverySub }, 'Somatic Exercise Regimen:'),
+    React.createElement(Text, { style: styles.sectionBody }, protocol.somatic_exercise_plan),
 
-      <Text style={[styles.sectionBody, { marginTop: 6, fontWeight: 600 }]}>
-        Confidence Anchor: <Text style={{fontWeight: 400}}>{protocol.confidence_anchor}</Text>
-      </Text>
+    React.createElement(Text, { style: [styles.sectionBody, { marginTop: 6, fontWeight: 600 }] },
+      'Confidence Anchor: ',
+      React.createElement(Text, { style: { fontWeight: 400 } }, protocol.confidence_anchor)
+    ),
 
-      <Text style={{ fontSize: 7, color: colors.muted, marginTop: 8, fontStyle: 'italic' }}>
-        * {protocol.medical_disclaimer}
-      </Text>
-    </View>
+    React.createElement(Text, { style: { fontSize: 7, color: colors.muted, marginTop: 8, fontStyle: 'italic' } },
+      `* ${protocol.medical_disclaimer}`
+    )
   );
 };
 
@@ -113,67 +109,67 @@ const ClinicalReportDocument = ({ report }) => {
     return colors.riskWatch;
   };
 
-  return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.headerBar}>
-          <View>
-            <Text style={styles.headerTitle}>AuraOS Clinical Triage Report</Text>
-            <Text style={styles.headerSub}>Generated: {generatedAt}  |  Report ID: {report._id || 'N/A'}</Text>
-          </View>
-          <View style={[styles.riskBadge, { backgroundColor: riskColor(report.riskLevel) }]}>
-            <Text style={styles.riskBadgeText}>{(report.riskLevel || 'WATCH').toUpperCase()}</Text>
-          </View>
-        </View>
+  const worries = (report.shatteredWorryBlocks || []).slice(0, 10);
+  const timeline = (report.timelineMicroquests || []).sort((a, b) => (a.order || 0) - (b.order || 0)).slice(0, 10);
 
-        <SectionTitle number={1}>Session Context</SectionTitle>
-        <InfoRow label="Patient ID" value={String(report.userId).slice(0, 12)} />
-        <InfoRow label="Current Task" value={report.currentTask} />
-        <InfoRow label="Blocker" value={report.selectedBlocker} />
-        <InfoRow label="Vocal Arousal" value={`${Number(report.vocalArousalScore || 0).toFixed(1)} / 10`} />
-        
-        <View style={styles.divider} />
+  return React.createElement(Document, null,
+    React.createElement(Page, { size: "A4", style: styles.page },
+      // Header
+      React.createElement(View, { style: styles.headerBar },
+        React.createElement(View, null,
+          React.createElement(Text, { style: styles.headerTitle }, "AuraOS Clinical Triage Report"),
+          React.createElement(Text, { style: styles.headerSub }, `Generated: ${generatedAt}  |  Report ID: ${report._id || 'N/A'}`)
+        ),
+        React.createElement(View, { style: [styles.riskBadge, { backgroundColor: riskColor(report.riskLevel) }] },
+          React.createElement(Text, { style: styles.riskBadgeText }, (report.riskLevel || 'WATCH').toUpperCase())
+        )
+      ),
 
-        <SectionTitle number={2}>Session Query</SectionTitle>
-        <Text style={styles.sectionBody}>{report.initialAnxietyQuery || 'No direct query captured.'}</Text>
-        
-        <View style={styles.divider} />
+      React.createElement(SectionTitle, { number: 1 }, "Session Context"),
+      React.createElement(InfoRow, { label: "Patient ID", value: String(report.userId || 'N/A').slice(0, 12) }),
+      React.createElement(InfoRow, { label: "Current Task", value: report.currentTask }),
+      React.createElement(InfoRow, { label: "Blocker", value: report.selectedBlocker }),
+      React.createElement(InfoRow, { label: "Vocal Arousal", value: `${Number(report.vocalArousalScore || 0).toFixed(1)} / 10` }),
+      
+      React.createElement(View, { style: styles.divider }),
 
-        <SectionTitle number={3}>Identified Worry Blocks</SectionTitle>
-        {(report.shatteredWorryBlocks || []).map((w, i) => (
-          <Bullet key={i}>"{w.text}" - weight {w.weight}/10</Bullet>
-        ))}
+      React.createElement(SectionTitle, { number: 2 }, "Session Query"),
+      React.createElement(Text, { style: styles.sectionBody }, report.initialAnxietyQuery || 'No direct query captured.'),
+      
+      React.createElement(View, { style: styles.divider }),
 
-        <SectionTitle number={4}>Task Timeline</SectionTitle>
-        {(report.timelineMicroquests || []).map((q, i) => (
-          <Bullet key={i}>[{q.completed ? '✓' : '○'}] {q.action} (~{q.duration_minutes}m)</Bullet>
-        ))}
+      React.createElement(SectionTitle, { number: 3 }, "Identified Worry Blocks"),
+      worries.length > 0 
+        ? worries.map((w, i) => React.createElement(Bullet, { key: i }, `"${w.text}" - weight ${w.weight}/10`))
+        : React.createElement(Text, { style: styles.sectionBody }, "None captured for this session."),
 
-        <View style={styles.divider} />
+      React.createElement(SectionTitle, { number: 4 }, "Task Timeline"),
+      timeline.length > 0
+        ? timeline.map((q, i) => React.createElement(Bullet, { key: i }, `[${q.completed ? '\u2713' : '\u25CB'}] ${q.action} (~${q.duration_minutes}m)`))
+        : React.createElement(Text, { style: styles.sectionBody }, "None captured for this session."),
 
-        <SectionTitle number={5}>AI Clinical Summary</SectionTitle>
-        <Text style={styles.sectionBody}>{report.aiStressSummary}</Text>
+      React.createElement(View, { style: styles.divider }),
 
-        {report.recoveryProtocol && <RecoveryProtocol protocol={report.recoveryProtocol} />}
+      React.createElement(SectionTitle, { number: 5 }, "AI Clinical Summary"),
+      React.createElement(Text, { style: styles.sectionBody }, report.aiStressSummary || 'AI summary unavailable.'),
 
-        <View style={styles.divider} />
+      report.recoveryProtocol && React.createElement(RecoveryProtocol, { protocol: report.recoveryProtocol }),
 
-        <SectionTitle number={6}>Guardian Contact</SectionTitle>
-        <InfoRow label="Guardian" value={report.guardian?.name} />
-        <InfoRow label="Contact" value={report.guardian?.phone || report.guardian?.email} />
+      React.createElement(View, { style: styles.divider }),
 
-        <Text style={styles.footer}>
-          This report is generated by AuraOS to support informed caregiving. Not a medical diagnosis. 
-          AuraOS - Neuroscience Powered Support.
-        </Text>
-      </Page>
-    </Document>
+      React.createElement(SectionTitle, { number: 6 }, "Guardian Contact"),
+      React.createElement(InfoRow, { label: "Guardian", value: report.guardian?.name }),
+      React.createElement(InfoRow, { label: "Contact", value: report.guardian?.phone || report.guardian?.email }),
+
+      React.createElement(Text, { style: styles.footer },
+        "This report is generated by AuraOS to support informed caregiving. Not a medical diagnosis. AuraOS - Neuroscience Powered Support."
+      )
+    )
   );
 };
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
 export const buildClinicalReportPdfBuffer = async report => {
-  return await renderToBuffer(<ClinicalReportDocument report={report} />);
+  return await renderToBuffer(React.createElement(ClinicalReportDocument, { report: report }));
 };
