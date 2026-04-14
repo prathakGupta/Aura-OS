@@ -50,7 +50,9 @@ export const breakdownTaskHandler = async (req, res) => {
   if (userId) {
     try {
       const user = await UserState.findOrCreate(userId);
-      user.taskHistory.forEach(t => { if (t.status === "active") t.status = "abandoned"; });
+      if (user.taskHistory) {
+        user.taskHistory.forEach(t => { if (t.status === "active") t.status = "abandoned"; });
+      }
       user.taskHistory.push(taskRecord);
       await user.save();
     } catch (dbErr) {
@@ -80,7 +82,7 @@ export const completeQuestHandler = async (req, res) => {
   const user = await UserState.findOne({ userId });
   if (!user) throw new AppError("User not found.", 404);
 
-  const task = user.taskHistory.find(t => t.id === taskId);
+  const task = (user.taskHistory || []).find(t => t.id === taskId);
   if (!task) throw new AppError("Task not found.", 404);
 
   const quest = task.microquests.find(q => q.id === questId);

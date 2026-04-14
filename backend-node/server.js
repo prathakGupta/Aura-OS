@@ -1,4 +1,4 @@
-// server.js — AuraOS backend-node entry point  🌟 UPDATED (clinical routes added)
+// server.js — AuraOS backend-node entry point
 import "dotenv/config";
 import express from "express";
 import cors    from "cors";
@@ -11,12 +11,9 @@ import { globalErrorHandler } from "./src/middleware/errorHandler.js";
 import forgeRoutes    from "./src/routes/forge.js";
 import shatterRoutes  from "./src/routes/shatter.js";
 import stateRoutes    from "./src/routes/state.js";
-import clinicalRoutes from "./src/routes/clinical.js"; // 🌟 NEW
-import authRoutes     from "./src/routes/auth.js";     // 🌟 AUTH
-import adminRoutes from "./src/routes/admin.js";
-
-import dotenv from "dotenv";
-dotenv.config({ path: "./backend-node/.env" });
+import clinicalRoutes from "./src/routes/clinical.js";
+import authRoutes     from "./src/routes/auth.js";
+import adminRoutes    from "./src/routes/admin.js";
 
 const app  = express();
 const PORT = process.env.PORT || 5001;
@@ -36,10 +33,19 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
-app.get("/health", (_, res) => res.json({
-  status: "ok", service: "aura-os-backend-node",
-  timestamp: new Date().toISOString(), uptime: Math.floor(process.uptime()),
-}));
+app.get("/health", async (_, res) => {
+  const dbStatus = connectDB.getState ? connectDB.getState() : "unknown"; // connectDB is a function usually, I should check mongoose
+  const mongoose = await import("mongoose");
+  
+  res.json({
+    status: "ok",
+    service: "aura-os-backend-node",
+    database: mongoose.default.connection.readyState === 1 ? "connected" : "disconnected",
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    memoryUsage: process.memoryUsage().rss,
+  });
+});
 
 app.use("/api/forge",    forgeRoutes);
 app.use("/api/shatter",  shatterRoutes);

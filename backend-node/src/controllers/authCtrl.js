@@ -219,7 +219,20 @@ export const completeGuardianSetup = async (req, res) => {
   try {
     const { token, password } = req.body;
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!token || !password) {
+      return res.status(400).json({ success: false, message: "Token and password are required." });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtErr) {
+      return res.status(400).json({
+        success: false,
+        message: "The invite link is invalid or has expired.",
+      });
+    }
+
     const guardian = await Guardian.findOne({
       linkedUserId: decoded.guardianId,
       inviteToken: token,
@@ -229,25 +242,21 @@ export const completeGuardianSetup = async (req, res) => {
     if (!guardian) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or already used invite token",
+        message: "This invite has already been used or is no longer valid.",
       });
     }
 
-    if (new Date() > guardian.inviteTokenExpiry) {
+    if (guardian.inviteTokenExpiry && new Date() > guardian.inviteTokenExpiry) {
       return res.status(400).json({
         success: false,
-        message: "Invite token has expired",
+        message: "This invite link has expired.",
       });
     }
 
-    await Guardian.findByIdAndUpdate(guardian._id, {
-      inviteAccepted: true,
-      inviteToken: null,
-      inviteTokenExpiry: null,
-    });
-
+    // Check for existing user BEFORE burning the token
     const existingUser = await User.findOne({ email: guardian.email });
     let authUser;
+
     if (!existingUser) {
       authUser = await User.create({
         email: guardian.email,
@@ -259,7 +268,19 @@ export const completeGuardianSetup = async (req, res) => {
       });
     } else {
       authUser = existingUser;
+      // If user exists but is not a guardian/admin, upgrade their role
+      if (authUser.role === "user") {
+        authUser.role = "guardian";
+        await authUser.save();
+      }
     }
+
+    // Transactional safety: Only clear the token after user is secured
+    await Guardian.findByIdAndUpdate(guardian._id, {
+      inviteAccepted: true,
+      inviteToken: null,
+      inviteTokenExpiry: null,
+    });
 
     return res.status(200).json({
       success: true,
@@ -270,7 +291,7 @@ export const completeGuardianSetup = async (req, res) => {
     console.error("completeGuardianSetup error:", err);
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: err.name === "ValidationError" ? err.message : "Server error during account setup",
     });
   }
 };

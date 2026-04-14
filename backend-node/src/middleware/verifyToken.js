@@ -18,8 +18,14 @@ const verifyToken = async (req, res, next) => {
 
     const user = await User.findById(decodedToken.id);
 
-    req.user = user || null;
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User account no longer exists",
+      });
+    }
 
+    req.user = user;
     next();
   } catch (err) {
     console.error("Token verification failed:", err.message);
