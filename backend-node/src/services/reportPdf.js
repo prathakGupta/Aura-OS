@@ -1,256 +1,179 @@
-// src/services/reportPdf.js — v2.0
-// Now includes Therapeutic Activity Suite section with game telemetry analysis.
-// Game sessions feed a predictive health analysis section for therapists.
+// src/services/reportPdf.js — v4.0 (Unified React-PDF Engine)
+// Professionally styled reports with embedded Clinical Recovery Protocols.
 
-import PDFDocument from 'pdfkit';
+import React from 'react';
+import { renderToBuffer, Document, Page, View, Text, StyleSheet, Font } from '@react-pdf/renderer';
 
-const clamp = (v, max = 300) => String(v || '').trim().slice(0, max);
+// ── Register Google Font (Inter) ──────────────────────────────────────────────
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfMZg.ttf', fontWeight: 400 },
+    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf', fontWeight: 600 },
+    { src: 'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYMZg.ttf', fontWeight: 700 }
+  ]
+});
 
-const bullets = (items, fallback = 'None captured for this session.') =>
-  items.length ? items.map((item) => `• ${item}`).join('\n') : fallback;
-
-const writeSection = (doc, title, body, opts = {}) => {
-  doc.font('Helvetica-Bold').fontSize(11.5).fillColor('#0f172a').text(title, { align: 'left' });
-  doc.moveDown(0.2);
-  doc.font('Helvetica').fontSize(10).fillColor('#1f2937').text(body, { align: 'left', lineGap: 2, ...opts });
-  doc.moveDown(0.8);
+// ── Styles ───────────────────────────────────────────────────────────────────
+const colors = {
+  dark: '#0f172a',
+  text: '#1e293b',
+  muted: '#64748b',
+  border: '#e2e8f0',
+  accent: '#3b82f6',
+  riskWatch: '#16a34a',
+  riskPre: '#ea580c',
+  riskAcute: '#dc2626',
+  bgLight: '#f8fafc',
+  white: '#ffffff',
+  recovery: '#eff6ff'
 };
 
-const writeSectionDivider = (doc) => {
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y)
-    .strokeColor('#e2e8f0').lineWidth(0.5).stroke();
-  doc.moveDown(0.5);
+const styles = StyleSheet.create({
+  page: { padding: 40, fontFamily: 'Inter', fontSize: 10, color: colors.text, lineHeight: 1.5 },
+  headerBar: { backgroundColor: colors.dark, padding: 16, marginBottom: 16, borderRadius: 4, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTitle: { color: colors.white, fontSize: 16, fontWeight: 700 },
+  headerSub: { color: '#94a3b8', fontSize: 8, marginTop: 2 },
+  riskBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 3, alignSelf: 'center' },
+  riskBadgeText: { color: colors.white, fontSize: 9, fontWeight: 700 },
+  sectionTitle: { fontSize: 12, fontWeight: 700, color: colors.dark, marginBottom: 4, marginTop: 12 },
+  sectionBody: { fontSize: 10, color: colors.text, lineHeight: 1.6 },
+  divider: { borderBottomWidth: 0.5, borderBottomColor: colors.border, marginVertical: 8 },
+  row: { flexDirection: 'row', marginBottom: 2 },
+  label: { fontWeight: 600, width: 140, color: colors.muted, fontSize: 9 },
+  value: { flex: 1, fontSize: 9.5 },
+  bulletItem: { flexDirection: 'row', marginLeft: 8, marginBottom: 2 },
+  bulletDot: { width: 12, fontSize: 9 },
+  bulletText: { flex: 1, fontSize: 9.5 },
+  card: { backgroundColor: colors.bgLight, borderRadius: 4, padding: 8, marginBottom: 6, borderWidth: 0.5, borderColor: colors.border },
+  recoveryBox: { backgroundColor: colors.recovery, borderRadius: 4, padding: 12, marginTop: 8, borderWidth: 0.5, borderColor: '#bfdbfe' },
+  recoveryTitle: { fontSize: 11, fontWeight: 700, color: '#1e40af', marginBottom: 6 },
+  recoverySub: { fontSize: 9, fontWeight: 600, color: '#1d4ed8', marginTop: 4 },
+  footer: { position: 'absolute', bottom: 24, left: 40, right: 40, fontSize: 7, color: colors.muted, textAlign: 'center' }
+});
+
+// ── Components ───────────────────────────────────────────────────────────────
+
+const SectionTitle = ({ number, children }) => (
+  <Text style={styles.sectionTitle}>{number}. {children}</Text>
+);
+
+const InfoRow = ({ label, value }) => (
+  <View style={styles.row}>
+    <Text style={styles.label}>{label}</Text>
+    <Text style={styles.value}>{value || 'N/A'}</Text>
+  </View>
+);
+
+const Bullet = ({ children }) => (
+  <View style={styles.bulletItem}>
+    <Text style={styles.bulletDot}>  •</Text>
+    <Text style={styles.bulletText}>{children}</Text>
+  </View>
+);
+
+const RecoveryProtocol = ({ protocol }) => {
+  if (!protocol) return null;
+  return (
+    <View style={styles.recoveryBox}>
+      <Text style={styles.recoveryTitle}>7. Clinical Recovery Protocol</Text>
+      
+      <Text style={styles.recoverySub}>Primary Assessment:</Text>
+      <Text style={styles.sectionBody}>{protocol.diagnosis_baseline}</Text>
+      
+      <Text style={styles.recoverySub}>Neuro-Dietary Protocol:</Text>
+      {(protocol.neuro_diet_plan || []).map((item, i) => (
+        <Bullet key={i}>{item}</Bullet>
+      ))}
+
+      <Text style={styles.recoverySub}>Somatic Exercise Regimen:</Text>
+      <Text style={styles.sectionBody}>{protocol.somatic_exercise_plan}</Text>
+
+      <Text style={[styles.sectionBody, { marginTop: 6, fontWeight: 600 }]}>
+        Confidence Anchor: <Text style={{fontWeight: 400}}>{protocol.confidence_anchor}</Text>
+      </Text>
+
+      <Text style={{ fontSize: 7, color: colors.muted, marginTop: 8, fontStyle: 'italic' }}>
+        * {protocol.medical_disclaimer}
+      </Text>
+    </View>
+  );
 };
 
-const riskColor = (level) => {
-  if (level === 'acute-distress') return '#dc2626';
-  if (level === 'pre-burnout') return '#ea580c';
-  return '#16a34a';
-};
+// ── Document Definition ──────────────────────────────────────────────────────
 
-const arousalLabel = (level) => ({
-  high: 'HIGH — Elevated neurological arousal detected',
-  moderate: 'MODERATE — Normal stress processing range',
-  low: 'LOW — Calm state, possible disengagement',
-}[level] || 'UNKNOWN');
-
-export const buildClinicalReportPdfBuffer = async (report) => {
-  const doc = new PDFDocument({
-    size: 'A4',
-    margins: { top: 44, bottom: 44, left: 48, right: 48 },
-    info: {
-      Title: `AuraOS Clinical Report — ${report.userId || 'User'}`,
-      Author: 'AuraOS Clinical Intelligence Layer',
-      Subject: 'Mental Health Telemetry Report',
-    },
+const ClinicalReportDocument = ({ report }) => {
+  const generatedAt = new Date(report.meta?.generatedAt || report.createdAt || Date.now()).toLocaleString('en-IN', {
+    dateStyle: 'medium', timeStyle: 'short'
   });
 
-  const chunks = [];
-  doc.on('data', (chunk) => chunks.push(chunk));
+  const riskColor = level => {
+    if (level === 'acute-distress') return colors.riskAcute;
+    if (level === 'pre-burnout') return colors.riskPre;
+    return colors.riskWatch;
+  };
 
-  // ── Header band ───────────────────────────────────────────────────────────
-  const pageW = doc.page.width;
-  const margin = doc.page.margins.left;
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* Header */}
+        <View style={styles.headerBar}>
+          <View>
+            <Text style={styles.headerTitle}>AuraOS Clinical Triage Report</Text>
+            <Text style={styles.headerSub}>Generated: {generatedAt}  |  Report ID: {report._id || 'N/A'}</Text>
+          </View>
+          <View style={[styles.riskBadge, { backgroundColor: riskColor(report.riskLevel) }]}>
+            <Text style={styles.riskBadgeText}>{(report.riskLevel || 'WATCH').toUpperCase()}</Text>
+          </View>
+        </View>
 
-  doc.rect(margin - 4, 28, pageW - (margin - 4) * 2, 52).fill('#0f172a');
+        <SectionTitle number={1}>Session Context</SectionTitle>
+        <InfoRow label="Patient ID" value={String(report.userId).slice(0, 12)} />
+        <InfoRow label="Current Task" value={report.currentTask} />
+        <InfoRow label="Blocker" value={report.selectedBlocker} />
+        <InfoRow label="Vocal Arousal" value={`${Number(report.vocalArousalScore || 0).toFixed(1)} / 10`} />
+        
+        <View style={styles.divider} />
 
-  doc.fillColor('#e2e8f0').font('Helvetica-Bold').fontSize(14)
-    .text('AuraOS Clinical Triage Report', margin, 40, { align: 'left' });
+        <SectionTitle number={2}>Session Query</SectionTitle>
+        <Text style={styles.sectionBody}>{report.initialAnxietyQuery || 'No direct query captured.'}</Text>
+        
+        <View style={styles.divider} />
 
-  const generatedAt = new Date(report.meta?.generatedAt || report.createdAt || Date.now())
-    .toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+        <SectionTitle number={3}>Identified Worry Blocks</SectionTitle>
+        {(report.shatteredWorryBlocks || []).map((w, i) => (
+          <Bullet key={i}>"{w.text}" - weight {w.weight}/10</Bullet>
+        ))}
 
-  doc.fillColor('#94a3b8').font('Helvetica').fontSize(9)
-    .text(`Generated: ${generatedAt}  |  Risk: ${(report.riskLevel || 'watch').toUpperCase()}  |  Report ID: ${report._id || 'N/A'}`,
-      margin, 58, { align: 'left' });
+        <SectionTitle number={4}>Task Timeline</SectionTitle>
+        {(report.timelineMicroquests || []).map((q, i) => (
+          <Bullet key={i}>[{q.completed ? '✓' : '○'}] {q.action} (~{q.duration_minutes}m)</Bullet>
+        ))}
 
-  // Risk badge
-  const riskX = pageW - margin - 80;
-  doc.rect(riskX, 36, 76, 22).fill(riskColor(report.riskLevel));
-  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(9)
-    .text((report.riskLevel || 'WATCH').toUpperCase(), riskX + 4, 43, { width: 68, align: 'center' });
+        <View style={styles.divider} />
 
-  doc.fillColor('#111827');
-  doc.x = margin;
-  doc.y = 100;
-  doc.moveDown(0.5);
+        <SectionTitle number={5}>AI Clinical Summary</SectionTitle>
+        <Text style={styles.sectionBody}>{report.aiStressSummary}</Text>
 
-  // ── Section 1: Session Context ────────────────────────────────────────────
-  writeSection(doc, '1. Session Context', [
-    `Patient ID:        ${clamp(report.userId, 80) || 'N/A'}`,
-    `Current Task:      ${clamp(report.currentTask, 200) || 'Not specified'}`,
-    `Blocker Selected:  ${clamp(report.selectedBlocker, 120) || 'Not specified'}`,
-    `Vocal Arousal:     ${Number(report.vocalArousalScore || 0).toFixed(1)} / 10`,
-    `Risk Classification: ${clamp(report.riskLevel, 40) || 'watch'}`,
-  ].join('\n'));
+        {report.recoveryProtocol && <RecoveryProtocol protocol={report.recoveryProtocol} />}
 
-  writeSectionDivider(doc);
+        <View style={styles.divider} />
 
-  // ── Section 2: Initial Anxiety Query ─────────────────────────────────────
-  writeSection(doc, '2. Initial Anxiety Query / Self-Report',
-    clamp(report.initialAnxietyQuery, 700) || 'No direct query captured in this report window.');
+        <SectionTitle number={6}>Guardian Contact</SectionTitle>
+        <InfoRow label="Guardian" value={report.guardian?.name} />
+        <InfoRow label="Contact" value={report.guardian?.phone || report.guardian?.email} />
 
-  writeSectionDivider(doc);
+        <Text style={styles.footer}>
+          This report is generated by AuraOS to support informed caregiving. Not a medical diagnosis. 
+          AuraOS - Neuroscience Powered Support.
+        </Text>
+      </Page>
+    </Document>
+  );
+};
 
-  // ── Section 3: Shattered Worry Blocks ────────────────────────────────────
-  const worries = (report.shatteredWorryBlocks || []).slice(0, 10)
-    .map((w, i) => `${i + 1}. "${clamp(w.text, 80)}" — weight ${w.weight || '?'}/10 [${w.status || 'active'}]`);
+// ── Export ───────────────────────────────────────────────────────────────────
 
-  writeSection(doc, '3. Identified Worry Blocks', bullets(worries));
-  writeSectionDivider(doc);
-
-  // ── Section 4: Shattered Task Timeline ───────────────────────────────────
-  const timeline = (report.timelineMicroquests || [])
-    .sort((a, b) => (a.order || 0) - (b.order || 0)).slice(0, 10)
-    .map((q, i) => {
-      const d = Number(q.duration_minutes) || 2;
-      const done = q.completed ? '✓' : '○';
-      return `${i + 1}. [${done}] ${clamp(q.action, 120)} (~${d}m)`;
-    });
-
-  writeSection(doc, '4. Task Timeline (User-Arranged Order)', bullets(timeline));
-  writeSectionDivider(doc);
-
-  // ── Section 5: Therapeutic Activity Suite ────────────────────────────────
-  const sessions = report.gameSessions || report.meta?.gameSessions || [];
-
-  if (sessions.length > 0) {
-    doc.font('Helvetica-Bold').fontSize(11.5).fillColor('#0f172a')
-      .text('5. Therapeutic Activity Suite', { align: 'left' });
-    doc.moveDown(0.2);
-
-    doc.font('Helvetica').fontSize(10).fillColor('#374151')
-      .text(`The patient engaged with ${sessions.length} therapeutic game session(s) during this AuraOS visit, ` +
-        `totalling ${sessions.reduce((s, g) => s + (g.durationSeconds || 0), 0)} seconds of active intervention. ` +
-        'Interaction patterns provide the following predictive health indicators:', { lineGap: 2 });
-    doc.moveDown(0.5);
-
-    sessions.forEach((session, idx) => {
-      const eff = session.predictedEffects || {};
-      doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#1e40af')
-        .text(`  ${idx + 1}. ${session.gameName || session.gameId}`, { align: 'left' });
-      doc.moveDown(0.1);
-
-      const lines = [
-        `     Duration: ${session.durationSeconds}s  |  Score: ${session.score}  |  Interactions: ${session.interactions}`,
-        `     Reaction Time (avg): ${session.avgReactionMs}ms  |  Accuracy: ${session.accuracy}%`,
-        `     Arousal Level: ${arousalLabel(eff.arousalLevel)}`,
-        `     Stress Reduction (est.): ${eff.stressReduction || 0}/10  |  Dopamine Activation: ${eff.dopamineActivation || 0}/10  |  Focus Score: ${eff.focusScore || 0}/10`,
-      ];
-
-      doc.font('Helvetica').fontSize(9.5).fillColor('#374151')
-        .text(lines.join('\n'), { lineGap: 1.5 });
-
-      if (eff.clinicalNote) {
-        doc.moveDown(0.15);
-        doc.font('Helvetica').fontSize(9).fillColor('#6b7280')
-          .text(`     Clinical Note: ${clamp(eff.clinicalNote, 300)}`, { lineGap: 1.5 });
-      }
-      doc.moveDown(0.45);
-    });
-
-    // Aggregate summary
-    const totalStressRed = sessions.reduce((s, g) => s + (g.predictedEffects?.stressReduction || 0), 0);
-    const totalDopamine  = sessions.reduce((s, g) => s + (g.predictedEffects?.dopamineActivation || 0), 0);
-    const avgFocus       = sessions.length
-      ? (sessions.reduce((s, g) => s + (g.predictedEffects?.focusScore || 0), 0) / sessions.length).toFixed(1)
-      : 0;
-
-    const highArousal = sessions.filter((s) => s.predictedEffects?.arousalLevel === 'high').length;
-    const aggNote = highArousal >= 2
-      ? `${highArousal} of ${sessions.length} sessions showed HIGH arousal patterns, suggesting significant emotional activation requiring therapeutic follow-up.`
-      : `Activity patterns indicate moderate to normal emotional regulation capacity. Continued engagement with therapeutic activities is recommended.`;
-
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a')
-      .text('  Aggregate Therapeutic Activity Analysis:', { align: 'left' });
-    doc.font('Helvetica').fontSize(9.5).fillColor('#374151')
-      .text([
-        `  • Total Predicted Stress Reduction: ${totalStressRed} cumulative units across ${sessions.length} sessions`,
-        `  • Total Dopamine Activation Events: ${totalDopamine} cumulative units`,
-        `  • Average Focus Score: ${avgFocus}/10`,
-        `  • ${aggNote}`,
-      ].join('\n'), { lineGap: 2 });
-    doc.moveDown(0.8);
-    writeSectionDivider(doc);
-  } else {
-    writeSection(doc, '5. Therapeutic Activity Suite',
-      'No therapeutic game sessions were logged during this session. Consider encouraging the patient to engage with the ' +
-      'Bug Zapper, Focus Dot, or Cloud Bloom activities in a follow-up session to gather baseline interaction data.');
-    writeSectionDivider(doc);
-  }
-
-  // ── Section 6: AI Stress Summary ─────────────────────────────────────────
-  const sectionNum = 6;
-  writeSection(doc, `${sectionNum}. AI Clinical Stress Summary`,
-    clamp(report.aiStressSummary, 1400) || 'AI summary unavailable for this session.');
-  writeSectionDivider(doc);
-
-  // ── Section 7: Clinical Recovery Protocol (Diet & Exercise) ──────────────
-  if (report.recoveryProtocol) {
-    const p = report.recoveryProtocol;
-    doc.font('Helvetica-Bold').fontSize(11.5).fillColor('#0f172a').text(`${sectionNum + 1}. Clinical Recovery Protocol`, { align: 'left' });
-    doc.moveDown(0.2);
-
-    // Diagnosis
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e40af').text('Primary Assessment: ', { continued: true });
-    doc.font('Helvetica').fillColor('#374151').text(clamp(p.diagnosis_baseline, 400));
-    doc.moveDown(0.2);
-
-    // Diet
-    const diets = Array.isArray(p.neuro_diet_plan) ? p.neuro_diet_plan : [];
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#15803d').text('Neuro-Dietary Protocol:');
-    if (diets.length) {
-      doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(bullets(diets), { lineGap: 1.5 });
-    } else {
-      doc.font('Helvetica').fontSize(9.5).fillColor('#6b7280').text('No specific dietary protocol generated.');
-    }
-    doc.moveDown(0.4);
-
-    // Somatic Exercise
-    doc.font('Helvetica-Bold').fontSize(10).fillColor('#b91c1c').text('Somatic / Exercise Regimen:');
-    doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(clamp(p.somatic_exercise_plan, 500) || 'No specific exercise recommended.', { lineGap: 1.5 });
-    doc.moveDown(0.4);
-
-    // Confidence Anchor
-    if (p.confidence_anchor) {
-      doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#0f172a').text('Confidence Anchor: ', { continued: true });
-      doc.font('Helvetica').fillColor('#4b5563').text(clamp(p.confidence_anchor, 400));
-    }
-    
-    // Disclaimer
-    const disclaimer = clamp(p.medical_disclaimer, 300) || 'AuraOS provides neuro-supportive lifestyle suggestions, not medical prescriptions. Consult a doctor for severe symptoms.';
-    doc.moveDown(0.4);
-    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#9ca3af').text(`* ${disclaimer}`);
-    
-    doc.moveDown(0.8);
-    writeSectionDivider(doc);
-  }
-
-  // ── Section 8: Guardian Contact ───────────────────────────────────────────
-  const gLine    = report.guardian?.name
-    ? `${clamp(report.guardian.name, 80)} | ${clamp(report.guardian.relation, 60) || 'relation N/A'}`
-    : 'Guardian details not on file';
-  const cLine    = report.guardian?.phone || report.guardian?.email
-    ? [report.guardian.phone, report.guardian.email].filter(Boolean).map(s => clamp(s, 120)).join('  |  ')
-    : 'No contact details';
-
-  const guardianSectionNum = report.recoveryProtocol ? sectionNum + 2 : sectionNum + 1;
-  writeSection(doc, `${guardianSectionNum}. Guardian Contact`, `${gLine}\n${cLine}`);
-
-  // ── Footer ────────────────────────────────────────────────────────────────
-  doc.moveDown(1);
-  doc.font('Helvetica').fontSize(8).fillColor('#9ca3af')
-    .text(
-      'This report is generated by AuraOS to support informed caregiving during stress-related events. ' +
-      'It is not a medical diagnosis. All game-derived metrics are predictive estimates based on interaction ' +
-      'patterns and should be interpreted in conjunction with clinical observation. AuraOS.',
-      { align: 'left', lineGap: 2 }
-    );
-
-  doc.end();
-
-  return new Promise((resolve, reject) => {
-    doc.on('end',   () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-  });
+export const buildClinicalReportPdfBuffer = async report => {
+  return await renderToBuffer(<ClinicalReportDocument report={report} />);
 };

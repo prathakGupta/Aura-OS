@@ -21,6 +21,7 @@ import Matter from 'matter-js';
 import useStore from '../../store/useStore.js';
 import { forgeApi } from '../../services/api.js';
 import PerceptionProbe from '../PerceptionProbe.jsx';
+import usePhysics from '../../hooks/usePhysics.js';
 
 const { Engine, Render, Runner, World, Bodies, Body, Composite, Events, Mouse, MouseConstraint } = Matter;
 
@@ -1174,165 +1175,125 @@ const weightToStyle=w=>{
 // MAIN CognitiveForge component
 // ════════════════════════════════════════════════════════════════════════════════
 export default function CognitiveForge() {
-  const sceneRef    = useRef(null);const engineRef=useRef(null);const worldRef=useRef(null);
-  const renderRef   = useRef(null);const runnerRef=useRef(null);const mcRef=useRef(null);
-  const incRef      = useRef(null);const boundaryRef=useRef([]);const resizeRafRef=useRef(null);
-  const timersRef   = useRef([]);const dimsRef=useRef({width:MAX_W,height:PHYSICS_H});
-  const reframeRef  = useRef('I release this. I am stronger than my worries.');
-  const lastDestroyRef=useRef(0);const comboRef=useRef(0);const comboTimerRef=useRef(null);
+  const canvasRef = useRef(null);
+  const reframeRef = useRef('I release this. I am stronger than my worries.');
+  const lastDestroyRef = useRef(0);
+  const comboRef = useRef(0);
+  const comboTimerRef = useRef(null);
 
-  const [text,         setText]        = useState('');
-  const [reframeText,  setReframeText] = useState('I release this. I am stronger than my worries.');
-  const [isLoading,    setLoading]     = useState(false);
-  const [error,        setError]       = useState(null);
-  const [hasBlocks,    setHasBlocks]   = useState(false);
-  const [destroyedN,   setDestroyedN]  = useState(0);
-  const [comboDisplay, setComboDisplay]= useState(0);
-  const [showCombo,    setShowCombo]   = useState(false);
-  const [showInput,    setShowInput]   = useState(true);
-  const [phoenixTexts, setPhoenixTexts]= useState([]);
-  const [activeGame,   setActiveGame]  = useState(null);
-  const [gameSessions, setGameSessions]= useState([]);
-  const [reportBusy,   setReportBusy] = useState(false);
-  const [reportMsg,    setReportMsg]  = useState(null);
+  const [text, setText] = useState('');
+  const [reframeText, setReframeText] = useState('I release this. I am stronger than my worries.');
+  const [isLoading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [hasBlocks, setHasBlocks] = useState(false);
+  const [destroyedN, setDestroyedN] = useState(0);
+  const [comboDisplay, setComboDisplay] = useState(0);
+  const [showCombo, setShowCombo] = useState(false);
+  const [showInput, setShowInput] = useState(true);
+  const [phoenixTexts, setPhoenixTexts] = useState([]);
+  const [activeGame, setActiveGame] = useState(null);
+  const [gameSessions, setGameSessions] = useState([]);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportMsg, setReportMsg] = useState(null);
 
   const { userId, worries, setWorries, markWorryDestroyed } = useStore();
-  useEffect(()=>{reframeRef.current=reframeText;},[reframeText]);
-  const rememberTimer=useCallback(id=>{timersRef.current.push(id);},[]);
-  const clearTimers=useCallback(()=>{timersRef.current.forEach(clearTimeout);timersRef.current=[];},[]);
+  useEffect(() => { reframeRef.current = reframeText; }, [reframeText]);
 
-  const triggerCombo=useCallback(n=>{
-    setComboDisplay(n);setShowCombo(true);
-    playTone([523,659,784,1047,1319][Math.min(n-1,4)],'triangle',0.25,0.15);
-    if(comboTimerRef.current)clearTimeout(comboTimerRef.current);
-    comboTimerRef.current=setTimeout(()=>{setShowCombo(false);comboRef.current=0;},2000);
-  },[]);
+  const triggerCombo = useCallback((n) => {
+    setComboDisplay(n);
+    setShowCombo(true);
+    playTone([523, 659, 784, 1047, 1319][Math.min(n - 1, 4)], 'triangle', 0.25, 0.15);
+    if (comboTimerRef.current) clearTimeout(comboTimerRef.current);
+    comboTimerRef.current = setTimeout(() => { setShowCombo(false); comboRef.current = 0; }, 2000);
+  }, []);
 
-  const onWorryDestroyed=useCallback((uuid,bx,by)=>{
-    markWorryDestroyed(uuid);
-    const now=Date.now();
-    if(now-lastDestroyRef.current<2000)comboRef.current+=1;else comboRef.current=1;
-    lastDestroyRef.current=now;setDestroyedN(n=>n+1);
-    playTone(280,'sawtooth',0.09,0.15);
-    const canvas=renderRef.current?.canvas;const rect=canvas?.getBoundingClientRect?.();
-    const sx=rect?rect.left+bx*(rect.width/dimsRef.current.width):window.innerWidth/2;
-    const sy=rect?rect.top+by*(rect.height/dimsRef.current.height):window.innerHeight*0.8;
-    confetti({particleCount:18+comboRef.current*7,spread:55,origin:{x:sx/window.innerWidth,y:sy/window.innerHeight},colors:['#fb7185','#f97316','#f59e0b','#67e8f9','#c4b5fd'],ticks:85,gravity:0.5,scalar:0.8,startVelocity:18});
-    if(comboRef.current>=2)triggerCombo(comboRef.current);
-    const pid=`px-${Date.now()}`;
-    setPhoenixTexts(p=>[...p.slice(-2),{id:pid,text:reframeRef.current?.trim()||'I am free.'}]);
-    setTimeout(()=>setPhoenixTexts(p=>p.filter(x=>x.id!==pid)),3500);
-    if(userId)forgeApi.destroy(userId,uuid).catch(()=>{});
-  },[markWorryDestroyed,triggerCombo,userId]);
+  const onWordDestroyed = useCallback((uuid) => {
+    const now = Date.now();
+    if (now - lastDestroyRef.current < 2000) comboRef.current += 1;
+    else comboRef.current = 1;
+    
+    lastDestroyRef.current = now;
+    setDestroyedN(n => n + 1);
+    playTone(280, 'sawtooth', 0.09, 0.15);
+    
+    if (comboRef.current >= 2) triggerCombo(comboRef.current);
+    
+    const pid = `px-${Date.now()}`;
+    setPhoenixTexts(p => [...p.slice(-2), { id: pid, text: reframeRef.current?.trim() || 'I am free.' }]);
+    setTimeout(() => setPhoenixTexts(p => p.filter(x => x.id !== pid)), 3500);
 
-  const addWorryBlock=useCallback((worryText,options={})=>{
-    const world=worldRef.current;if(!world)return null;
-    const{width}=dimsRef.current;const weight=Math.max(1,Math.min(10,Number(options.weight)||5));
-    const blockW=Math.max(140,100+weight*18);const style=weightToStyle(weight);
-    const x=options.x??(80+Math.random()*Math.max(1,width-160));const y=options.y??(-55-Math.random()*50);
-    const body=Bodies.rectangle(x,y,blockW,58,{label:'worry_block',density:0.006+weight*0.0003,restitution:0.12,friction:0.85,frictionAir:0.04,chamfer:{radius:10},render:{fillStyle:style.fill,strokeStyle:style.stroke,lineWidth:1.5}});
-    body.plugin={kind:'worry_block',text:String(worryText||'worry').slice(0,60),labelColor:style.label,uuid:options.uuid||uuidv4(),weight,consumed:false};
-    Body.setAngularVelocity(body,(Math.random()-0.5)*0.06);World.add(world,body);return body;
-  },[]);
+    if (uuid && userId) {
+      markWorryDestroyed(uuid);
+      forgeApi.destroy(userId, uuid).catch(() => {});
+    }
+  }, [triggerCombo, markWorryDestroyed, userId]);
 
-  const shatterWorryBlock=useCallback(b=>{
-    const world=worldRef.current;if(!world||!b||b.plugin?.consumed)return;
-    b.plugin.consumed=true;const{x,y}=b.position;const uuid=b.plugin?.uuid;
-    Composite.remove(world,b);if(uuid)onWorryDestroyed(uuid,x,y);
-  },[onWorryDestroyed]);
+  const { init, spawnWords, clearAll } = usePhysics(canvasRef, onWordDestroyed);
 
-  const spawnWorryBatch=useCallback(worryItems=>{
-    requestAnimationFrame(()=>{
-      const{width}=dimsRef.current;const positions=getGridSpawnPositions(worryItems.length,width);
-      worryItems.forEach((worry,idx)=>{ const t=setTimeout(()=>{ addWorryBlock(worry.worry,{uuid:worry.uuid||uuidv4(),weight:worry.weight,x:positions[idx]?.x,y:positions[idx]?.y}); },100+idx*150); rememberTimer(t); });
-    });
-  },[addWorryBlock,rememberTimer]);
+  useEffect(() => {
+    init();
+  }, [init]);
 
-  const clearWorldBodies=useCallback(()=>{
-    const world=worldRef.current;if(!world)return;
-    Composite.allBodies(world).filter(b=>b.label!=='boundary'&&b.label!=='incinerator').forEach(b=>Composite.remove(world,b));
-    clearTimers();
-  },[clearTimers]);
-
-  useEffect(()=>{
-    const host=sceneRef.current;if(!host||engineRef.current)return;
-    host.innerHTML='';
-    const engine=Engine.create({gravity:{x:0,y:0.9},positionIterations:8,velocityIterations:6});
-    const render=Render.create({element:host,engine,options:{width:MAX_W,height:PHYSICS_H,wireframes:false,background:'transparent',pixelRatio:Math.min(window.devicePixelRatio||1,2)}});
-    render.canvas.style.width='100%';render.canvas.style.height=`${PHYSICS_H}px`;render.canvas.style.display='block';
-    const runner=Runner.create();const world=engine.world;
-    engineRef.current=engine;renderRef.current=render;runnerRef.current=runner;worldRef.current=world;
-    const makeBoundaries=(w,h)=>{
-      const opts={isStatic:true,label:'boundary',render:{visible:false}};
-      const inc=Bodies.rectangle(w/2,h-20,w-60,40,{isStatic:true,isSensor:true,label:'incinerator',render:{visible:false}});
-      return{bodies:[Bodies.rectangle(w/2,h+30,w+100,60,opts),Bodies.rectangle(-30,h/2,60,h+100,opts),Bodies.rectangle(w+30,h/2,60,h+100,opts),Bodies.rectangle(w/2,-30,w+100,60,opts),inc],inc};
-    };
-    const syncSize=()=>{
-      const nw=Math.min(MAX_W,Math.max(MIN_W,Math.floor(host.clientWidth||MAX_W)));const nh=PHYSICS_H;
-      const{width:pw,height:ph}=dimsRef.current;if(nw===pw&&nh===ph)return;
-      dimsRef.current={width:nw,height:nh};render.options.width=nw;render.options.height=nh;
-      const dpr=Math.min(window.devicePixelRatio||1,2);render.canvas.width=nw*dpr;render.canvas.height=nh*dpr;
-      render.canvas.style.width='100%';render.canvas.style.height=`${nh}px`;
-      if(boundaryRef.current.length)boundaryRef.current.forEach(b=>Composite.remove(world,b));
-      const{bodies,inc}=makeBoundaries(nw,nh);boundaryRef.current=bodies;incRef.current=inc;World.add(world,bodies);
-    };
-    requestAnimationFrame(syncSize);
-    const scheduleResize=()=>{if(resizeRafRef.current)cancelAnimationFrame(resizeRafRef.current);resizeRafRef.current=requestAnimationFrame(syncSize);};
-    let ro=null;if(typeof ResizeObserver!=='undefined'){ro=new ResizeObserver(scheduleResize);ro.observe(host);}else window.addEventListener('resize',scheduleResize);
-    const mouse=Mouse.create(render.canvas);
-    const mc=MouseConstraint.create(engine,{mouse,constraint:{stiffness:0.18,damping:0.22,render:{visible:true,lineWidth:1,strokeStyle:'rgba(251,191,36,0.3)'}}});
-    render.mouse=mouse;mcRef.current=mc;World.add(world,mc);
-    const onCollision=({pairs})=>{pairs.forEach(({bodyA,bodyB})=>{const isInc=bodyA.label==='incinerator'||bodyB.label==='incinerator';if(!isInc)return;const block=bodyA.label==='worry_block'?bodyA:bodyB.label==='worry_block'?bodyB:null;if(block)shatterWorryBlock(block);});};
-    const onAfterRender=()=>{const ctx=render.context;Composite.allBodies(world).forEach(body=>{if(body.label!=='worry_block'||!body.plugin?.text)return;ctx.save();ctx.translate(body.position.x,body.position.y);ctx.rotate(body.angle);ctx.font='600 12.5px "Plus Jakarta Sans",system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=body.plugin.labelColor||'rgba(255,241,242,0.95)';ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=6;drawWrappedText(ctx,body.plugin.text,body.bounds.max.x-body.bounds.min.x);ctx.restore();});};
-    Events.on(engine,'collisionStart',onCollision);Events.on(render,'afterRender',onAfterRender);
-    Render.run(render);Runner.run(runner,engine);
-    return()=>{
-      if(ro)ro.disconnect();else window.removeEventListener('resize',scheduleResize);
-      if(resizeRafRef.current)cancelAnimationFrame(resizeRafRef.current);clearTimers();
-      Events.off(engine,'collisionStart',onCollision);Events.off(render,'afterRender',onAfterRender);
-      if(mcRef.current)World.remove(world,mcRef.current);
-      Render.stop(render);Runner.stop(runner);World.clear(world,false);Engine.clear(engine);
-      if(render.canvas?.parentNode)render.canvas.parentNode.removeChild(render.canvas);render.textures={};
-      engineRef.current=null;renderRef.current=null;runnerRef.current=null;worldRef.current=null;
-    };
-  },[clearTimers,shatterWorryBlock]);
-
-  const handleGameSessionEnd=useCallback(rawMetrics=>{
-    const predictedEffects=derivePredictedEffects(rawMetrics.gameId,rawMetrics);
-    setGameSessions(prev=>[...prev,{...rawMetrics,predictedEffects,completedAt:new Date().toISOString()}]);
+  const handleGameSessionEnd = useCallback(rawMetrics => {
+    const predictedEffects = derivePredictedEffects(rawMetrics.gameId, rawMetrics);
+    setGameSessions(prev => [...prev, { ...rawMetrics, predictedEffects, completedAt: new Date().toISOString() }]);
     setActiveGame(null);
     setReportMsg(`${rawMetrics.gameName} logged · ${rawMetrics.durationSeconds}s`);
-    setTimeout(()=>setReportMsg(null),3000);
-  },[]);
+    setTimeout(() => setReportMsg(null), 3000);
+  }, []);
 
-  const handleExtract=async()=>{
-    if(!text.trim()||isLoading)return;
-    setError(null);setLoading(true);
-    try{
-      const data=await forgeApi.extract(text.trim(),userId);
-      const nextWorries=(data.worries||[]).map((w,idx)=>({...w,id:w.id??idx+1,uuid:w.uuid||uuidv4(),status:w.status||'active'}));
-      setWorries(nextWorries);clearWorldBodies();spawnWorryBatch(nextWorries);
-      setHasBlocks(nextWorries.length>0);setShowInput(false);setDestroyedN(0);comboRef.current=0;
-    }catch(err){setError(err.message||'Could not extract worries.');}
-    finally{setLoading(false);}
+  const handleExtract = async () => {
+    if (!text.trim() || isLoading) return;
+    
+    const wordsArray = text.split(' ').filter(w => w.trim() !== '');
+    if (wordsArray.length === 0) return;
+    
+    const nextWorries = wordsArray.map((w, idx) => ({ id: idx + 1, uuid: uuidv4(), worry: w, weight: 5, status: 'active' }));
+    setWorries(nextWorries);
+    clearAll();
+    
+    spawnWords(wordsArray);
+    
+    setHasBlocks(true);
+    setShowInput(false);
+    setDestroyedN(0);
+    comboRef.current = 0;
   };
 
-  const handleGenerateReport=async()=>{
-    if(!userId||reportBusy)return;
+  const handleGenerateReport = async () => {
+    if (!userId || reportBusy) return;
     setReportBusy(true);
-    try{
-      const{clinicalApi}=await import('../../services/portalApi.js');
-      const res=await clinicalApi.sessionReport({userId,source:'manual',currentTask:'Cognitive Forge session',vocalArousalScore:5,sendToGuardian:false,sessionSnapshot:{initialAnxietyQuery:text,shatteredWorryBlocks:worries.map(w=>({id:w.uuid||String(w.id),text:w.worry,weight:w.weight,status:w.status||'active'})),gameSessions,notes:gameSessions.length?`${gameSessions.map(s=>`${s.gameName}(${s.durationSeconds}s,score:${s.score})`).join(', ')}.`:'No games played.'}});
-      if(res.downloadUrl)window.open(res.downloadUrl,'_blank','noopener,noreferrer');
-      setReportMsg(`PDF ready · Risk: ${res.riskLevel}`);setTimeout(()=>setReportMsg(null),5000);
-    }catch(e){setReportMsg(`PDF failed: ${e.message}`);setTimeout(()=>setReportMsg(null),4000);}
-    finally{setReportBusy(false);}
+    try {
+      const { clinicalApi } = await import('../../services/portalApi.js');
+      const res = await clinicalApi.sessionReport({
+        userId, source: 'manual', currentTask: 'Cognitive Forge session', vocalArousalScore: 5, sendToGuardian: false,
+        sessionSnapshot: { initialAnxietyQuery: text, shatteredWorryBlocks: worries.map(w => ({ id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active' })), gameSessions, notes: gameSessions.length ? `${gameSessions.map(s => `${s.gameName}(${s.durationSeconds}s,score:${s.score})`).join(', ')}.` : 'No games played.' }
+      });
+      if (res.downloadUrl) window.open(res.downloadUrl, '_blank', 'noopener,noreferrer');
+      setReportMsg(`PDF ready · Risk: ${res.riskLevel}`);
+      setTimeout(() => setReportMsg(null), 5000);
+    } catch (e) {
+      setReportMsg(`PDF failed: ${e.message}`);
+      setTimeout(() => setReportMsg(null), 4000);
+    } finally {
+      setReportBusy(false);
+    }
   };
 
-  const handleReset=()=>{clearWorldBodies();setWorries([]);setHasBlocks(false);setDestroyedN(0);setShowInput(true);setText('');setPhoenixTexts([]);comboRef.current=0;setShowCombo(false);};
+  const handleReset = () => {
+    clearAll();
+    setWorries([]);
+    setHasBlocks(false);
+    setDestroyedN(0);
+    setShowInput(true);
+    setText('');
+    setPhoenixTexts([]);
+    comboRef.current = 0;
+    setShowCombo(false);
+  };
 
-  const activeCount=worries.filter(w=>w.status!=='destroyed').length;
-  const allCleared=hasBlocks&&activeCount===0;
+  const activeCount = hasBlocks ? Math.max(0, worries.length - destroyedN) : 0;
+  const allCleared = hasBlocks && activeCount === 0;
   const leftGames=GAME_DEFS.filter(g=>g.side==='left');
   const rightGames=GAME_DEFS.filter(g=>g.side==='right');
   const ActiveGameComponent=activeGame?GAME_DEFS.find(g=>g.id===activeGame)?.Component:null;
@@ -1387,7 +1348,7 @@ export default function CognitiveForge() {
           {/* Physics canvas */}
           <div style={{position:'relative',borderRadius:20,overflow:'hidden',border:'1px solid rgba(125,211,252,0.12)',background:'radial-gradient(ellipse at 50% 5%,rgba(34,211,238,0.18) 0%,transparent 50%),radial-gradient(ellipse at 50% 100%,rgba(251,146,60,0.2) 0%,transparent 40%),linear-gradient(180deg,#030712 0%,#020617 60%,#0b1120 100%)',minHeight:PHYSICS_H}}>
             <div style={{position:'absolute',inset:0,pointerEvents:'none',zIndex:0,backgroundImage:'radial-gradient(rgba(103,232,249,0.07) 1px,transparent 1px)',backgroundSize:'28px 28px'}}/>
-            <div ref={sceneRef} style={{position:'relative',zIndex:1,minHeight:PHYSICS_H}}/>
+            <div ref={canvasRef} style={{position:'relative',zIndex:1,flex:1,width:'100%'}}/>
             <AnimatePresence>
               {showCombo&&comboDisplay>=2&&(
                 <motion.div initial={{opacity:0,scale:0.4,y:-20}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:1.5,y:-40}}
