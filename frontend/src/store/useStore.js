@@ -28,8 +28,10 @@ const useStore = create((set, get) => ({
   userId:        null,
   isInitialized: false,
 
-  initSession: async () => {
-    const stored = localStorage.getItem("aura-userId") || undefined;
+  initSession: async (forcedId) => {
+    // If we have a forcedId (e.g. from Auth), use it. 
+    // Otherwise fallback to localStorage or generate 
+    const stored = forcedId || localStorage.getItem("aura-userId") || undefined;
     try {
       const data = await stateApi.init(stored);
       localStorage.setItem("aura-userId", data.userId);
@@ -41,6 +43,12 @@ const useStore = create((set, get) => ({
       localStorage.setItem("aura-userId", fallbackId);
       set({ userId: fallbackId, isInitialized: true });
     }
+  },
+
+  setUserId: (id) => {
+    if (!id) return;
+    localStorage.setItem("aura-userId", id);
+    set({ userId: id });
   },
 
   // ── Mental health profile ──────────────────────────────────

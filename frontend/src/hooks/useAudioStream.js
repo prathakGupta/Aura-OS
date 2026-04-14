@@ -10,6 +10,7 @@
 
 import { useRef, useCallback, useEffect } from "react";
 import useStore from "../store/useStore.js";
+import useTelemetry from "./useTelemetry.js";
 
 const isBrowser = typeof window !== "undefined";
 
@@ -57,6 +58,7 @@ export default function useAudioStream() {
     audioMuted,
     setAuraSpeaking,
   } = useStore();
+  const { logVocalStress } = useTelemetry();
 
   useEffect(() => {
     audioMutedRef.current = audioMuted;
@@ -257,7 +259,15 @@ export default function useAudioStream() {
 
               case "response":
                 setAuraResponse(msg.text || "");
-                if (msg.emotion) setAuraEmotion(msg.emotion);
+                if (msg.emotion) {
+                  setAuraEmotion(msg.emotion);
+                  // 🌟 Log telemetry
+                  logVocalStress({
+                    emotion: msg.emotion,
+                    arousalScore: msg.arousal_score || (msg.emotion === 'high_anxiety' ? 9 : msg.emotion === 'mild_anxiety' ? 6 : 3),
+                    taskContext: "Talking to Aura"
+                  });
+                }
 
                 if (typeof msg.tts_audio === "string" && msg.tts_audio && audioCtxRef.current && !audioMutedRef.current) {
                   try {
@@ -293,7 +303,15 @@ export default function useAudioStream() {
                 break;
 
               case "emotion_update":
-                setAuraEmotion(msg.emotion || "");
+                if (msg.emotion) {
+                  setAuraEmotion(msg.emotion);
+                  // 🌟 Log telemetry
+                  logVocalStress({
+                    emotion: msg.emotion,
+                    arousalScore: msg.arousal_score || (msg.emotion === 'high_anxiety' ? 9 : msg.emotion === 'mild_anxiety' ? 6 : 3),
+                    taskContext: "Aura Background Monitoring"
+                  });
+                }
                 break;
 
               default:

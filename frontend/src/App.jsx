@@ -74,7 +74,7 @@ function ProfileBadge({ profile, onReset }) {
 export default function App() {
   const {
     activeTab, setTab,
-    initSession, isInitialized, userId,
+    initSession, isInitialized, userId, setUserId,
     setActiveTask,
     userProfile, setUserProfile, clearUserProfile,
   } = useStore();
@@ -108,13 +108,28 @@ export default function App() {
     if (isPortalView) return;
     const runInit = async () => {
       try {
-        await initSession();
+        // IMPORTANT: Prioritize the authenticated user ID for the session.
+        // This ensures telemetry created while logged-in is linked to the DB account.
+        const targetId = user?.id || localStorage.getItem("aura-userId") || undefined;
+        await initSession(targetId);
       } catch {
         setInitError(true);
       }
     };
     runInit();
-  }, [initSession, isPortalView]);
+  }, [initSession, isPortalView, user?.id]);
+
+  // Sync userId if login happens later
+  useEffect(() => {
+    if (user?.id && userId !== user.id) {
+      setUserId(user.id);
+      // 🌟 Baseline Migration: If they completed intake as a guest, 
+      // push their score to the new permanent DB record now.
+      if (userProfile?.baselineArousalScore) {
+        stateApi.patchIntake(user.id, userProfile.baselineArousalScore).catch(() => {});
+      }
+    }
+  }, [user?.id, userId, setUserId, userProfile?.baselineArousalScore]);
 
   /* ── Show intake on first visit (no stored profile) ── */
   useEffect(() => {
