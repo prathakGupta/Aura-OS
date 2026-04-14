@@ -2,6 +2,8 @@
 .env
 .env.*
 
+/backend-node/src/config/serviceAccountKey.json
+
 # Node.js dependencies
 node_modules/
 

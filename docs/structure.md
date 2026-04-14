@@ -1,74 +1,165 @@
-# Aura-OS Project Structure
+# Aura-OS System Architecture & Structure
 
-This document provides an overview of the file structure and the primary functions of each component in the Aura-OS repository.
+This document tracks the main project directories and files, providing an updated overview of the system map and the specific function of each file. Large vendor directories (`node_modules/`, `.venv/`), datasets (`crema-d/`), and model training checkpoints are omitted for clarity and conciseness.
 
-## Root Directory
-- `docker-compose.yml`: Orchestrates the multi-container environment (Frontend, Node.js Backend, Python Backend, MongoDB, and ChromaDB).
-- `package.json`: Defines project dependencies and global scripts.
-- `README.md`: Main documentation for setup, architecture, and project mission.
-- `.gitignore`: Specially configured to exclude environment variables, dependencies (`node_modules`), and large model artifacts.
+## Directory Tree
 
----
+```text
+Aura-OS/
+├── README.md
+├── FOLDER_STRUCTURE.md
+├── docker-compose.yml
+├── package.json
+├── package-lock.json
+│
+├── docs/
+│   ├── API_CONTRACTS.md
+│   ├── architecture-diagram.png
+│   ├── pitch-deck.pdf
+│   └── structure.md
+│
+├── frontend/
+│   ├── index.html
+│   ├── package.json
+│   ├── tailwind.config.js
+│   ├── vite.config.js
+│   └── src/
+│       ├── App.jsx
+│       ├── index.css
+│       ├── main.jsx
+│       ├── components/
+│       │   ├── ErrorBoundary.jsx
+│       │   ├── MentalHealthIntake.jsx
+│       │   ├── aura-voice/
+│       │   │   └── AuraVoice.jsx
+│       │   ├── clinical-rag/
+│       │   │   └── ClinicalRecovery.jsx
+│       │   ├── cognitive-forge/
+│       │   │   └── CognitiveForge.jsx
+│       │   ├── landing/
+│       │   │   └── LandingPage.jsx
+│       │   ├── observer-portal/
+│       │   │   ├── Dashboard.jsx
+│       │   │   ├── TriageLog.jsx
+│       │   │   └── VsiChart.jsx
+│       │   └── task-shatter/
+│       │       ├── BodyDouble.jsx
+│       │       └── TaskShatter.jsx
+│       ├── hooks/
+│       │   ├── useAudioStream.js
+│       │   ├── useFocusTimer.js
+│       │   ├── usePhysics.js
+│       │   └── useTelemetry.js
+│       ├── physics/
+│       │   ├── engine.js
+│       │   ├── entities.js
+│       │   └── interactions.js
+│       ├── services/
+│       │   ├── api.js
+│       │   └── portalApi.js
+│       └── store/
+│           └── useStore.js
+│
+├── backend-node/
+│   ├── package.json
+│   ├── server.js
+│   └── src/
+│       ├── clinical_knowledge/
+│       │   ├── adhd_rules.txt
+│       │   └── anxiety_rules.txt
+│       ├── config/
+│       │   └── db.js
+│       ├── controllers/
+│       │   ├── clinicalCtrl.js
+│       │   ├── forgeCtrl.js
+│       │   └── stateCtrl.js
+│       ├── middleware/
+│       │   └── errorHandler.js
+│       ├── models/
+│       │   ├── AlertLog.js
+│       │   ├── ClinicalReport.js
+│       │   └── UserState.js
+│       ├── routes/
+│       │   ├── clinical.js
+│       │   └── forge.js
+│       └── services/
+│           ├── gemini.js
+│           ├── langchain.js
+│           ├── reportPdf.js
+│           └── triageEngine.js
+│
+└── backend-python/
+    ├── requirements.txt
+    ├── app/
+    │   ├── main.py
+    │   ├── api/
+    │   │   ├── routes_ai.py
+    │   │   ├── routes_audio.py
+    │   │   └── routes_rag.py
+    │   ├── core/
+    │   │   ├── config.py
+    │   │   └── database.py
+    │   └── services/
+    │       ├── audio_engine.py
+    │       ├── behavioral_scorer.py
+    │       ├── rag_service.py
+    │       └── voice_service.py
+    ├── clinical_knowledge/
+    │   └── condition_protocols.txt
+    ├── models/
+    │   ├── stress_mlp.pkl
+    │   ├── aura_arousal_rf.pkl
+    │   └── wav2vec2_emotion.pt
+    └── training/
+        ├── train_ensemble.py
+        └── train_wav2vec2.py
+```
 
-## 🛠️ `backend-node/` (Service Orchestration)
-The primary API layer for user management, state persistence, and clinical workflow orchestration.
+## Functional Overview
 
-- `server.js`: Entry point for the Express server; handles middleware, security, and database connections.
-- **`src/controllers/`**: Core request handlers.
-  - `clinicalCtrl.js`: Manages panic triggers, guardian alerts, dashboard metrics, and clinical PDF generation.
-  - `forgeCtrl.js`: Logic for the "Cognitive Forge" (worry-offloading) sessions.
-  - `shatterCtrl.js`: Handles "Task Shattering" logic for decomposing overwhelming objectives.
-  - `stateCtrl.js`: General user state and session telemetry persistence.
-- **`src/services/`**: Integration and business logic layer.
-  - `langchain.js`: Manages clinical AI prompts and structured response parsing via LangChain.
-  - `gemini.js`: Direct interface with Google Gemini AI for advanced reasoning.
-  - `reportPdf.js`: Engine for generating high-fidelity clinical reports and recovery protocols in PDF format.
-  - `twilio.js`: Dispatches SMS and WhatsApp notifications to guardians during high-arousal events.
-  - `email.js`: Sends weekly/automated clinical updates to designated care providers.
-  - `triageEngine.js`: Analyzes telemetry patterns to determine burnout risk levels.
-- **`src/models/`**: MongoDB/Mongoose schemas for `UserState`, `AlertLog`, and `ClinicalReport`.
+### Root
+- **`README.md`**: Main documentation providing an overview of Aura-OS, installation, and deployment instructions.
+- **`docker-compose.yml`**: Deployment configuration to stand up the Node and Python backends simultaneously.
+- **`package.json`**: NPM configurations for managing global scripts or monorepo tools.
 
----
+### `docs/`
+- Documentation suite covering structural knowledge and diagrams.
+- **`API_CONTRACTS.md`**: Specification of API request/response structures between frontend and both backends.
+- **`structure.md`**: This manifest detailing the architecture.
 
-## 🐍 `backend-python/` (AI & ML Engine)
-Specialized backend for computationally intensive tasks like audio processing, emotion detection, and RAG.
+### `frontend/`
+A Vite and React-based interface providing high-fidelity visual interactions for users. Features global physics capabilities and telemetry tracking.
+- **`src/App.jsx`**: Main application router and root layout.
+- **`src/components/`**: Feature-grouped UI components:
+  - **`aura-voice/`**: UI logic handling voice interactions with the emotional engine.
+  - **`clinical-rag/`**: UI components presenting dynamically synthesized scientific protocols.
+  - **`cognitive-forge/`**: Task breakdown layouts.
+  - **`observer-portal/`**: Clinician dashboard components, rendering VSI metrics and telemetry.
+- **`src/hooks/`**: Custom hooks bridging features:
+  - **`useTelemetry.js`**: Streams user telemetry data to external states.
+  - **`useAudioStream.js`**: Handles microphone buffer routing to the backend.
+- **`src/physics/`**: Custom, performance-oriented physics engine driving glass UI logic and animations.
+- **`src/services/api.js`**: API client bridging the UI with `backend-node` and `backend-python`.
+- **`src/store/useStore.js`**: Generic state management container.
 
-- `app/main.py`: Entry point for the FastAPI server.
-- **`app/services/`**: The "Brain" of Aura-OS.
-  - `audio_engine.py`: Handles real-time audio streams, transcription, and noise suppression.
-  - `voice_service.py`: Utilizes ML models to detect emotional valence and arousal from vocal telemetry.
-  - `rag_service.py`: Implements Retrieval-Augmented Generation for clinical knowledge retrieval from vector stores.
-  - `behavioral_scorer.py`: Calculates executive function and behavioral health scores.
-  - `node_bridge.py`: Manages IPC and data synchronization with the Node.js backend.
-- **`app/api/`**: API routes for AI classification, RAG queries, and audio processing tasks.
-- **`training/`**: Scripts and Jupyter notebooks for training custom emotion classification models.
-- **`models/`**: Storage for pre-trained model weights (e.g., Wav2Vec2, Random Forest classifiers).
+### `backend-node/`
+The lightweight gateway infrastructure serving as an orchestration layer. Usually acts as an intermediary, routing tasks that do not require heavy ML inference.
+- **`src/server.js`**: Express boilerplate and server initialization.
+- **`src/config/db.js`**: Connection configuration for the primary MongoDB cluster.
+- **`src/controllers/`** & **`src/routes/`**: Handle HTTP endpoints for the Clinical protocol generators and routine data logging.
+- **`src/models/`**: Mongoose schemas tracking `UserState` dynamically and recording comprehensive `ClinicalReport` logic.
+- **`src/services/`**:
+  - **`reportPdf.js`**: Generates customized professional reports for export.
+  - **`langchain.js` / `gemini.js`**: Bridges communication to generic LLM logic for standardized non-RAG text queries.
 
----
-
-## 💻 `frontend/` (User Experience)
-A high-fidelity React application optimized for low-friction interactions and ADHD-friendly design.
-
-- `src/App.jsx`: Main application controller and routing engine.
-- `src/index.css`: Global design system including glassmorphism utilities and smooth-motion animations.
-- **`src/components/`**: Atomic and molecular UI components.
-  - `Regulators/`: High-fidelity somatic grounding exercises (breathing, brown noise).
-  - `Forge/`: Interactive elements for the Cognitive Forge module.
-  - `Shatter/`: Interface for breaking down and visualizing complex tasks.
-- **`src/services/`**: API service layer for communicating with the Node.js and Python backends.
-- **`src/store/`**: Global state management (Zustand) for real-time telemetry and user configurations.
-- **`src/physics/`**: Specialized logic for procedural animations and physics-based UI transitions.
-
----
-
-## 🌐 `landing/` (Landing Page)
-The public-facing portal for Aura-OS.
-
-- `index.html`: A standalone, highly animated landing page that introduces the "Digital Nervous System" concept.
-
----
-
-## 📚 `docs/` (Documentation)
-- `API_CONTRACTS.md`: Detailed definitions of internal and external API interfaces.
-- `architecture-diagram.png`: Visual overview of the system's data flow.
-- `structure.md`: This file.
+### `backend-python/`
+The High-Performance API backend, written in FastAPI, executing mission-critical ML processes, ML ensemble validation, and deep retrieval pipelines.
+- **`app/main.py`**: The FastAPI application entrypoint.
+- **`app/api/`**: Route definitions delegating AI payloads to core services.
+- **`app/services/`**: Core engines:
+  - **`audio_engine.py` / `voice_service.py`**: Pushes audio chunks through the deep-learning array (`wav2vec2`) to extract sophisticated arousal/stress telemetries.
+  - **`rag_service.py`**: Processes vector-store interactions against ChromaDB to build grounded RAG models from clinical rules.
+  - **`behavioral_scorer.py`**: Correlates inputs across the ML ensemble models to emit a unified state score.
+- **`models/`**: Static serialized binaries of trained models (Random Forest, MLP, Scikit-learn scalers, and PyTorch deep-learning weights) enabling rapid startup without retraining.
+- **`training/`**: Data ingestion, normalization scripts (`build_dataset.py`, `extract_features.py`) and training orchestration workflows.
+- **`clinical_knowledge/`**: The primary corpus of neurochemistry facts used as the grounding context for RAG processing.

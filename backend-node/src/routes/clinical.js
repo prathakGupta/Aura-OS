@@ -1,6 +1,7 @@
 // src/routes/clinical.js  🌟 NEW
 import express from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import verifyToken from '../middleware/verifyToken.js';
 import {
   triggerAlertHandler,
   logVocalStressHandler,
@@ -25,10 +26,10 @@ router.post('/guardian',        asyncHandler(setGuardianHandler));
 router.put('/guardian',         asyncHandler(setGuardianHandler));
 
 // Observer Portal data
-router.get('/dashboard/:userId',asyncHandler(getDashboardMetricsHandler));
+router.get('/dashboard/:userId', verifyToken, asyncHandler(getDashboardMetricsHandler));
 
 // Therapy brief generation
-router.post('/therapy-brief',   asyncHandler(generateTherapyBriefHandler));
+router.post('/therapy-brief', verifyToken, asyncHandler(generateTherapyBriefHandler));
 
 // Session report generation + manual PDF download
 router.post('/session-report', asyncHandler(generateSessionReportHandler));
