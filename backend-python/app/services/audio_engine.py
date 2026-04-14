@@ -398,6 +398,15 @@ class EmotionEngine:
             model_source=source,
         )
 
+    def get_engine_status(self) -> dict:
+        """Returns the readiness status of the ML models to prevent silent failures."""
+        return {
+            "heuristic_fallback": not self.is_ready and not self.has_wav2vec2,
+            "ensemble_loaded": self.is_ready,
+            "wav2vec2_loaded": self.has_wav2vec2,
+            "expected_features": 103  # The fixed dimension size the pipeline expects
+        }
+
 
 # -- Helpers -----------------------------------------------------------
 
@@ -416,6 +425,11 @@ def _emotion_from_stress(s: float) -> str:
 # -- Singleton + backward-compatible API -------------------------------
 
 _engine = EmotionEngine()
+
+
+def get_audio_engine_status() -> dict:
+    """Check the load status of ML models in the engine singleton."""
+    return _engine.get_engine_status()
 
 
 def analyze_audio_chunk(samples: np.ndarray) -> AudioFeatures:

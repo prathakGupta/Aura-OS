@@ -54,6 +54,8 @@ app.include_router(rag_router, prefix="/api/v1/rag", tags=["Clinical RAG"])
 app.include_router(behavioral_router, prefix="/api/v1/behavioral", tags=["Behavioral Health"])
 
 
+from app.services.audio_engine import get_audio_engine_status
+
 @app.get("/")
 async def root():
     return {"message": "AuraOS Engine is online and ready."}
@@ -61,4 +63,13 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "service": "aura-python-backend"}
+    ml_status = get_audio_engine_status()
+    # Let's also include whether it's operating purely on heuristic fallback
+    status_msg = "online" if not ml_status["heuristic_fallback"] else "online (heuristic fallback mode)"
+    
+    return {
+        "ok": True, 
+        "service": "aura-python-backend",
+        "status": status_msg,
+        "ml_engine": ml_status
+    }
