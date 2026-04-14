@@ -1,6 +1,5 @@
 import User from "../models/User.js";
 import Guardian from "../models/Guardian.js";
-import admin from "../config/firebase.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -54,7 +53,7 @@ export const getAllUsers = async (req, res) => {
         }
         if (user.role === "guardian") {
           const guardianRecord = await Guardian.findOne({
-            firebaseUid: user.firebaseUid,
+            email: user.email,
           })
             .select("linkedUserId fullName relationship inviteAccepted")
             .lean();
@@ -88,7 +87,7 @@ export const toggleSuspend = async (req, res) => {
     }
 
     // Prevent admin from suspending themselves
-    if (user.firebaseUid === req.firebaseUser.uid) {
+    if (user._id.toString() === req.user._id.toString()) {
       return res.status(400).json({
         success: false,
         message: "You cannot suspend your own account",
@@ -96,11 +95,6 @@ export const toggleSuspend = async (req, res) => {
     }
 
     const newStatus = !user.isActive;
-
-    // Disable or enable in Firebase
-    await admin.auth().updateUser(user.firebaseUid, {
-      disabled: !newStatus,
-    });
 
     // Update MongoDB
     await User.findByIdAndUpdate(id, { isActive: newStatus });

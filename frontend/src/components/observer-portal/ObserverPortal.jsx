@@ -33,7 +33,7 @@ export default function ObserverPortal() {
     setLoading(true);
     setError(null);
     try {
-      const token = await user.getIdToken(true);
+      const token = localStorage.getItem("token");
       const res = await clinicalApi.getDashboard(linkedUserId, days, token);
       setData(res);
     } catch (e) {
@@ -51,7 +51,7 @@ export default function ObserverPortal() {
     setGen(true);
     setBrief(null);
     try {
-      const token = await user.getIdToken(true);
+      const token = localStorage.getItem("token");
       const res = await clinicalApi.therapyBrief(linkedUserId, token);
       setBrief(res.brief);
     } catch (e) {

@@ -45,10 +45,7 @@ const guardianSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    firebaseUid: {
-      type: String,
-      default: null,
-    },
+
     portalAccessEnabled: {
       type: Boolean,
       default: true,

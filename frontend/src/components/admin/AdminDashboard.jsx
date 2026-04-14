@@ -49,7 +49,7 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const token = await user.getIdToken(true);
+      const token = localStorage.getItem("token");
       const [statsRes, usersRes] = await Promise.all([
         getAdminStats(token),
         getAdminUsers(token),
@@ -68,7 +68,7 @@ export default function AdminDashboard() {
   const handleSuspend = async (userId) => {
     setSuspendingId(userId);
     try {
-      const token = await user.getIdToken(true);
+      const token = localStorage.getItem("token");
       const res = await toggleSuspendUser(token, userId);
       setUsers(prev =>
         prev.map(u => u._id === userId ? { ...u, isActive: res.isActive } : u)
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
               ) : (
                 filtered.map((u, i) => {
                   const roleStyle = ROLE_COLORS[u.role] || ROLE_COLORS.user;
-                  const isCurrentUser = u.firebaseUid === user?.uid;
+                  const isCurrentUser = u._id === user?.id;
                   return (
                     <motion.div
                       key={u._id}

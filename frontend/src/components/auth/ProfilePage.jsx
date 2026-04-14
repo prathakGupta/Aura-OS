@@ -33,7 +33,7 @@ const ProfilePage = () => {
     setNameLoading(true);
     setError("");
     try {
-      const token = await user.getIdToken(true);
+      const token = localStorage.getItem("token");
       await updateUserProfile(token, { fullName: newName.trim() });
       await refreshProfile();
       setEditingName(false);
@@ -67,7 +67,7 @@ const ProfilePage = () => {
     if (deleteConfirmText !== "DELETE") return;
     setDeleteLoading(true);
     try {
-      const token = await user.getIdToken();
+      const token = localStorage.getItem("token");
       await deleteUserAccount(token);
       await logout();
       navigate("/goodbye", { replace: true });

@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import { createUserProfile } from "../../services/authApi";
 import ForgotPassword from "./ForgotPassword";
 
 const SignIn = () => {
-  const { signIn, signInWithGoogle, refreshProfile } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -33,44 +32,21 @@ const SignIn = () => {
     setError("");
     setLoading(true);
     try {
-      const result = await signIn(email, password);
-      const token = await result.user.getIdToken();
-      await handlePostAuth(token, result.user);
+      await signIn(email, password);
+      navigate("/app");
     } catch (err) {
-      setError(getFriendlyError(err.code));
-      console.error("SignIn Error:", err);
+      setError(err.message || "We couldn't sign you in with those details. Please check your email and password.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
-    setError("");
-    setLoading(true);
     try {
-      const result = await signInWithGoogle();
-      const token = await result.user.getIdToken();
-      await handlePostAuth(token, result.user, "google");
-    } catch (err) {
-      setError("Google sign in failed. Please try again.");
-    } finally {
-      setLoading(false);
+      await signInWithGoogle();
+    } catch(err) {
+       // feature unsupported, caught by authContext
     }
-  };
-
-  const handlePostAuth = async (token, firebaseUser, provider = "email") => {
-    try {
-      await createUserProfile(token, {
-        fullName: firebaseUser.displayName || "",
-        authProvider: provider,
-      });
-      await refreshProfile();
-    } catch (err) {
-      console.warn("[Auth] Profile sync skipped or failed (might already exist):", err.message);
-      // Try to refresh anyway to see if we have a profile
-      try { await refreshProfile(); } catch (e) { console.error("[Auth] Fatal profile refresh error:", e); }
-    }
-    navigate("/app");
   };
 
   if (showForgot) {

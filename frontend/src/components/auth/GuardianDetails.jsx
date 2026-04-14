@@ -26,7 +26,7 @@ const GuardianDetails = ({ signupData, onBack }) => {
 
     setLoading(true);
     try {
-      const token = signupData?.token || await user.getIdToken();
+      const token = signupData?.token || localStorage.getItem("token");
       await saveGuardianDetails(token, {
         fullName,
         relationship,
