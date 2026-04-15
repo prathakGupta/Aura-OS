@@ -1334,20 +1334,65 @@ export default function CognitiveForge() {
 
   const handleExtract = async () => {
     if (!text.trim() || isLoading) return;
-    
-    const wordsArray = text.split(' ').filter(w => w.trim() !== '');
-    if (wordsArray.length === 0) return;
-    
-    const nextWorries = wordsArray.map((w, idx) => ({ id: idx + 1, uuid: uuidv4(), worry: w, weight: 5, status: 'active' }));
-    setWorries(nextWorries);
-    clearAll();
-    
-    spawnWords(wordsArray);
-    
-    setHasBlocks(true);
-    setShowInput(false);
-    setDestroyedN(0);
-    comboRef.current = 0;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await forgeApi.extract(text.trim(), userId || undefined);
+      const extracted = Array.isArray(res?.worries) ? res.worries : [];
+
+      const nextWorries = extracted
+        .map((w, idx) => ({
+          id: w.id || idx + 1,
+          uuid: w.uuid || uuidv4(),
+          worry: String(w.worry || '').trim(),
+          weight: Math.min(10, Math.max(1, Number(w.weight) || 5)),
+          status: w.status || 'active',
+        }))
+        .filter((w) => w.worry.length > 0);
+
+      if (!nextWorries.length) {
+        throw new Error(res?.message || 'Could not identify clear worries. Try a bit more detail.');
+      }
+
+      setWorries(nextWorries);
+      clearAll();
+      spawnWords(nextWorries.map((w) => w.worry));
+      setHasBlocks(true);
+      setShowInput(false);
+      setDestroyedN(0);
+      comboRef.current = 0;
+    } catch (e) {
+      // Graceful fallback so forge UX never hard-fails during demos.
+      const fallback = text
+        .split(/[\n,.;!?]/)
+        .map((w) => w.trim())
+        .filter(Boolean)
+        .slice(0, 14);
+
+      if (!fallback.length) {
+        setError(e.message || 'Extraction failed. Please try again.');
+      } else {
+        const fallbackWorries = fallback.map((w, idx) => ({
+          id: idx + 1,
+          uuid: uuidv4(),
+          worry: w,
+          weight: 5,
+          status: 'active',
+        }));
+        setWorries(fallbackWorries);
+        clearAll();
+        spawnWords(fallback);
+        setHasBlocks(true);
+        setShowInput(false);
+        setDestroyedN(0);
+        comboRef.current = 0;
+        setError('AI extraction unavailable, running local fallback parsing.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGenerateReport = async () => {

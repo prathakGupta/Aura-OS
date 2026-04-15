@@ -10,18 +10,25 @@ export const AuthProvider = ({ children }) => {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // ── Shared helper: apply a full profile (from /me) to all state slices ──
+  const applyProfile = (p) => {
+    setProfile(p);
+    setRole(p?.role || null);
+    setOnboardingComplete(p?.onboardingComplete || false);
+    setUser({ id: p._id, email: p.email });
+  };
+
+  // ── On mount: restore session from stored token ──────────────────────────
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem("token");
       if (token) {
         try {
+          // /api/auth/me is the ONLY endpoint that returns linkedUserId for guardians
           const data = await getUserProfile(token);
-          setProfile(data.profile);
-          setRole(data.profile?.role || null);
-          setOnboardingComplete(data.profile?.onboardingComplete || false);
-          setUser({ id: data.profile._id, email: data.profile.email }); // mock user object
+          applyProfile(data.profile);
         } catch (err) {
-          console.error("Failed to fetch profile:", err);
+          console.error("Failed to restore session:", err);
           localStorage.removeItem("token");
           setProfile(null);
           setRole(null);
@@ -40,35 +47,56 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
+  // ── Sign in ───────────────────────────────────────────────────────────────
+  // CRITICAL FIX: After login, always call /me to get the full profile
+  // (including linkedUserId for guardians — the login endpoint doesn't return it)
   const signIn = async (email, password) => {
     const data = await loginUser({ email, password });
     if (data.success) {
       localStorage.setItem("token", data.token);
-      setProfile(data.profile);
-      setRole(data.profile?.role || null);
-      setOnboardingComplete(data.profile?.onboardingComplete || false);
-      setUser({ id: data.profile._id, email: data.profile.email });
+
+      // Start with what the login endpoint gave us (fast)
+      let fullProfile = data.profile;
+      try {
+        // Fetch complete profile — includes linkedUserId for guardians
+        const meData = await getUserProfile(data.token);
+        if (meData?.profile) fullProfile = meData.profile;
+      } catch (err) {
+        // Non-fatal: fall back to the basic login profile
+        console.warn("signIn: /me fetch failed, using basic profile", err.message);
+      }
+
+      applyProfile(fullProfile);
       return data;
     }
   };
 
+  // ── Sign up ───────────────────────────────────────────────────────────────
   const signUp = async (fullName, email, password) => {
     const data = await registerUser({ fullName, email, password });
     if (data.success) {
       localStorage.setItem("token", data.token);
-      setProfile(data.profile);
-      setRole(data.profile?.role || null);
-      setOnboardingComplete(data.profile?.onboardingComplete || false);
-      setUser({ id: data.profile._id, email: data.profile.email });
+
+      let fullProfile = data.profile;
+      try {
+        const meData = await getUserProfile(data.token);
+        if (meData?.profile) fullProfile = meData.profile;
+      } catch {
+        // Non-fatal
+      }
+
+      applyProfile(fullProfile);
       return data;
     }
   };
 
+  // ── Unsupported auth methods ──────────────────────────────────────────────
   const signInWithGoogle = () => {
     alert("Sign In with Google is currently unsupported.");
     return Promise.reject(new Error("Feature unsupported"));
   };
 
+  // ── Logout ────────────────────────────────────────────────────────────────
   const logout = () => {
     localStorage.removeItem("token");
     setUser(null);
@@ -77,19 +105,19 @@ export const AuthProvider = ({ children }) => {
     setOnboardingComplete(false);
   };
 
-  const resetPassword = (email) => {
+  // ── Reset password (placeholder) ─────────────────────────────────────────
+  const resetPassword = () => {
     alert("Reset password is not supported yet.");
     return Promise.reject(new Error("Feature unsupported"));
   };
 
+  // ── Refresh profile (e.g. after onboarding completes) ────────────────────
   const refreshProfile = async () => {
     const token = localStorage.getItem("token");
     if (token) {
       try {
         const data = await getUserProfile(token);
-        setProfile(data.profile);
-        setRole(data.profile?.role || null);
-        setOnboardingComplete(data.profile?.onboardingComplete || false);
+        if (data?.profile) applyProfile(data.profile);
       } catch (err) {
         console.error("refreshProfile failed:", err);
       }

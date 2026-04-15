@@ -61,6 +61,18 @@ _EMPTY = AudioFeatures(
 )
 
 
+def _is_git_lfs_pointer(path: str) -> bool:
+    """
+    Returns True when a file is a Git LFS pointer placeholder, not the real binary.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            header = f.readline().strip()
+        return header.startswith("version https://git-lfs.github.com/spec/v1")
+    except Exception:
+        return False
+
+
 # -- Locate model directory --------------------------------------------
 
 def _find_model_dir() -> str:
@@ -117,6 +129,12 @@ class EmotionEngine:
         needed = ["emotion_rf.pkl", "feature_scaler.pkl", "label_encoder.pkl"]
         if not all(os.path.exists(os.path.join(model_dir, f)) for f in needed):
             print(f"[WARN] [EmotionEngine] Models not found in {model_dir} -- heuristic mode.")
+            return
+        if any(_is_git_lfs_pointer(os.path.join(model_dir, f)) for f in needed):
+            print(
+                f"[WARN] [EmotionEngine] Model files in {model_dir} are Git LFS pointers. "
+                "Fetch real model binaries to enable ML mode."
+            )
             return
 
         try:
@@ -304,6 +322,8 @@ class EmotionEngine:
         rf_pred = int(rf_probs.argmax())
         emotion = self.le.inverse_transform([rf_pred])[0]
         confidence = float(rf_probs.max())
+        source = "rf"
+        blended = rf_probs
 
         # Model 2: XGBoost arousal
         if self.xgb is not None:

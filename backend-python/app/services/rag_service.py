@@ -37,12 +37,11 @@ except ImportError:
 try:
     from langchain.prompts import PromptTemplate
     from langchain_groq import ChatGroq
-    from pydantic import BaseModel, Field
 except ImportError:
     PromptTemplate = None
     ChatGroq = None
-    BaseModel = None
-    Field = None
+
+from pydantic import BaseModel, Field
 
 
 # ── Paths ───────────────────────────────────────────────────────────────

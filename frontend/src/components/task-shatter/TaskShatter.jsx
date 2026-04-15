@@ -429,13 +429,14 @@ export default function TaskShatter() {
   const constraintsRef = useRef(null);
   const dockRef = useRef(null);
   const apiCallRef = useRef(null);
+  const alertCallRef = useRef(null);
 
   const { noiseEnabled, toggleNoise } = useFocusTimer({
     isTaskActive: phase === 'focus',
     onDistracted: () => setBodyDouble(true),
     onReturned: () => setBodyDouble(false),
   });
-  const { recordDragEvent } = useTelemetry();
+  const { recordDragEvent, getDragStressScore } = useTelemetry();
 
   const focusQuests = activeTask?.microquests || [];
   const focusQuest = focusQuests[currentQuestIndex] || null;
@@ -465,27 +466,80 @@ export default function TaskShatter() {
     else if (phase === 'focus' && focusQuest) setLastKnownActivity(`Focusing on step ${currentQuestIndex + 1}: ${focusQuest.action}`);
   }, [phase, taskText, originalTask, focusQuest, currentQuestIndex, setLastKnownActivity]);
 
+  const buildWorrySnapshot = useCallback(() => (
+    worries.map((w) => ({
+      id: w.uuid || String(w.id),
+      text: w.worry,
+      weight: w.weight,
+      status: w.status || 'active',
+    }))
+  ), [worries]);
+
+  const dispatchGuardianEscalation = useCallback((reasonLabel) => {
+    if (!userId) return Promise.resolve(null);
+
+    const dragStress = getDragStressScore();
+    const arousalFromDrag = dragStress?.score || 8;
+    const resolvedArousal = Math.max(8, Math.min(10, Math.round(arousalFromDrag)));
+    const resolvedEmotion = resolvedArousal >= 8 ? 'high_anxiety' : 'mild_anxiety';
+    const resolvedTask = taskText.trim() || originalTask || 'Unknown';
+    const resolvedReason = reasonLabel || selectedBlocker?.label || 'Overwhelm';
+    const worryBlocks = buildWorrySnapshot();
+
+    const alertPromise = clinicalApi.triggerAlert({
+      userId,
+      taskSummary: resolvedTask,
+      blocker: resolvedReason,
+      selectedBlocker: resolvedReason,
+      vocalArousalScore: resolvedArousal,
+      emotion: resolvedEmotion,
+      recentHistory: {
+        selectedBlockerLabel: resolvedReason,
+        forgeUsage: `drag samples: ${dragStress?.sampleSize || 0}`,
+      },
+      sessionSnapshot: {
+        initialAnxietyQuery: taskText.trim() || originalTask,
+        shatteredWorryBlocks: worryBlocks,
+      },
+    }).catch((err) => {
+      console.warn('[AuraOS] triggerAlert failed:', err?.message || err);
+      return null;
+    });
+
+    // Keep PDF generation non-blocking and avoid duplicate guardian dispatch.
+    void clinicalApi.sessionReport({
+      userId,
+      source: 'panic',
+      currentTask: resolvedTask,
+      selectedBlocker: resolvedReason,
+      vocalArousalScore: resolvedArousal,
+      sendToGuardian: false,
+      sessionSnapshot: {
+        initialAnxietyQuery: taskText.trim() || originalTask,
+        shatteredWorryBlocks: worryBlocks,
+      },
+    }).catch((err) => {
+      console.warn('[AuraOS] panic session report failed:', err?.message || err);
+    });
+
+    return alertPromise;
+  }, [
+    buildWorrySnapshot,
+    getDragStressScore,
+    originalTask,
+    selectedBlocker?.label,
+    taskText,
+    userId,
+  ]);
+
   // Automated Freeze Detection (30 secs idle)
   const triggerCrisisFlow = useCallback(() => {
     setBlocker({ id: 'automated_freeze', label: 'Automated Freeze Detection' });
     setPhase('intervention');
     const activityStr = 'Automated Freeze Detection: ' + (lastKnownActivity || originalTask || taskText || 'Unknown');
-    apiCallRef.current = Promise.all([
-      shatterApi.coachBreakdown(taskText.trim() || 'Overwhelmed', 'too_overwhelming', userId).catch(() => null),
-      clinicalApi.sessionReport({
-        userId, source: 'panic',
-        currentTask: taskText.trim() || 'Unknown',
-        selectedBlocker: activityStr,
-        vocalArousalScore: 8,
-        sendToGuardian: true,
-        channels: { whatsapp: true, email: true },
-        sessionSnapshot: {
-          initialAnxietyQuery: taskText.trim(),
-          shatteredWorryBlocks: worries.map((w) => ({ id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active' })),
-        },
-      }).catch(() => null),
-    ]);
-  }, [lastKnownActivity, taskText, originalTask, userId, worries]);
+    apiCallRef.current = shatterApi.coachBreakdown(taskText.trim() || 'Overwhelmed', 'too_overwhelming', userId).catch(() => null);
+    alertCallRef.current = dispatchGuardianEscalation(activityStr);
+  }, [dispatchGuardianEscalation, lastKnownActivity, originalTask, taskText, userId]);
 
   useIdleDetection(30000, triggerCrisisFlow);
 
@@ -502,21 +556,8 @@ export default function TaskShatter() {
 
     if (blocker.id === 'too_overwhelming') {
       setPhase('intervention');
-      apiCallRef.current = Promise.all([
-        shatterApi.coachBreakdown(taskText.trim(), blocker.id, userId).catch(() => null),
-        clinicalApi.sessionReport({
-          userId, source: 'panic',
-          currentTask: taskText.trim(),
-          selectedBlocker: blocker.label,
-          vocalArousalScore: 8,
-          sendToGuardian: true,
-          channels: { whatsapp: true, email: true },
-          sessionSnapshot: {
-            initialAnxietyQuery: taskText.trim(),
-            shatteredWorryBlocks: worries.map((w) => ({ id: w.uuid || String(w.id), text: w.worry, weight: w.weight, status: w.status || 'active' })),
-          },
-        }).catch(() => null),
-      ]);
+      apiCallRef.current = shatterApi.coachBreakdown(taskText.trim(), blocker.id, userId).catch(() => null);
+      alertCallRef.current = dispatchGuardianEscalation(blocker.label);
     } else {
       setPhase('loading');
       try {
@@ -534,17 +575,18 @@ export default function TaskShatter() {
   const handleInterventionComplete = async () => {
     setPhase('loading');
     try {
-      const [shatterResult, alertRes] = await (apiCallRef.current || Promise.resolve([null, null]));
+      const shatterResult = await (apiCallRef.current || Promise.resolve(null));
       if (shatterResult) await _processAiResult(shatterResult);
       else {
         const fallback = await shatterApi.breakdown(taskText.trim(), userId);
         await _processAiResult({ microquests: fallback.microquests, coachMessage: null, envStrategy: null });
       }
-      // Show subtle alert result if available
-      if (alertRes?.riskLevel) {
-        // Non-blocking notification — just log
-        console.log('[AuraOS] Guardian triage:', alertRes.riskLevel);
-      }
+      // Keep guardian escalation detached from UX-critical task breakdown flow.
+      Promise.resolve(alertCallRef.current)
+        .then((alertRes) => {
+          if (alertRes?.riskLevel) console.log('[AuraOS] Guardian triage:', alertRes.riskLevel);
+        })
+        .catch(() => {});
     } catch (e) { setError(e.message); setPhase('coaching'); }
   };
 

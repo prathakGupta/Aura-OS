@@ -25,7 +25,8 @@ vi.mock('../../services/api.js', () => ({
 describe('ClinicalRecovery', () => {
   it('renders intake warning when user profile is missing', () => {
     render(<ClinicalRecovery userProfile={null} />);
-    expect(screen.getByText(/Please complete the intake/i)).toBeInTheDocument();
+    expect(screen.getByText(/Intake profile missing/i)).toBeInTheDocument();
+    expect(screen.getByText(/professional assessment/i)).toBeInTheDocument();
   });
 
   it('renders clinical recovery header when user profile is provided', () => {
@@ -35,7 +36,8 @@ describe('ClinicalRecovery', () => {
       baselineArousalScore: 5
     };
     render(<ClinicalRecovery userProfile={mockProfile} />);
-    expect(screen.getByText(/Clinical Recovery Protocol/i)).toBeInTheDocument();
-    expect(screen.getByText(/tailored for your anxiety profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/Precision/i)).toBeInTheDocument();
+    expect(screen.getByText(/Recovery/i)).toBeInTheDocument();
+    expect(screen.getByText(/anxiety profile/i)).toBeInTheDocument();
   });
 });

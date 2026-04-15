@@ -176,7 +176,7 @@ const GuardianInvite = () => {
             </div>
             <button
               className="auth-btn-primary"
-              onClick={() => { window.location.href = "/app" }}
+              onClick={() => { window.location.href = "/auth" }}
               style={{ marginTop: "8px" }}
             >
               Go to portal

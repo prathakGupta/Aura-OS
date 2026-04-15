@@ -8,15 +8,16 @@
 //   GET  /api/clinical/dashboard/:userId— Aggregated recharts-ready data
 //   POST /api/clinical/therapy-brief    — Generate 14-day clinical PDF brief
 
-import UserState   from "../models/UserState.js";
-import AlertLog    from "../models/AlertLog.js";
+import UserState      from "../models/UserState.js";
+import User           from "../models/User.js";
+import AlertLog       from "../models/AlertLog.js";
 import ClinicalReport from "../models/ClinicalReport.js";
 import { generateGuardianBrief, generateRecoveryProtocol } from "../services/langchain.js";
-import { sendGuardianAlert }     from "../services/twilio.js";
+import { sendGuardianAlert }      from "../services/twilio.js";
 import { sendGuardianReportEmail } from "../services/email.js";
 import { buildClinicalReportPdfBuffer } from "../services/reportPdf.js";
-import { evaluateBurnoutRisk }   from "../services/triageEngine.js";
-import { AppError }              from "../middleware/errorHandler.js";
+import { evaluateBurnoutRisk }    from "../services/triageEngine.js";
+import { AppError }               from "../middleware/errorHandler.js";
 
 // Fallback cache for generating PDFs when MongoDB is offline
 const localMemoryReports = new Map();
@@ -311,6 +312,16 @@ export const getDashboardMetricsHandler = async (req, res, next) => {
     // ── Recent alert log ─────────────────────────────────────────────────────
     const alerts = await AlertLog.find({ userId }).sort({ sentAt: -1 }).limit(10).lean();
 
+    // ── Patient name lookup ───────────────────────────────────────────────────
+    // userId here is the patient's MongoDB _id; look up their display name
+    let patientName = null;
+    try {
+      const patientUser = await User.findById(userId).select("fullName email").lean();
+      patientName = patientUser?.fullName || patientUser?.email || null;
+    } catch {
+      // Non-fatal — frontend will fall back to showing truncated ID
+    }
+
     // ── Summary stats ────────────────────────────────────────────────────────
     const stats = {
       tasksCompleted:  execRaw.filter(e => e.status === "completed").length,
@@ -323,6 +334,7 @@ export const getDashboardMetricsHandler = async (req, res, next) => {
     res.json({
       success: true,
       userId,
+      patientName,
       guardian: user.guardian || {},
       charts: { vsiByDay, execByDay, forgeByDay },
       stats,

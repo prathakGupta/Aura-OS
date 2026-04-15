@@ -92,5 +92,7 @@ async def api_trigger_triage(data: TriageTrigger, background_tasks: BackgroundTa
         
         # Immediately respond so the frontend UI doesn't lag
         return {"success": True, "message": "Triage protocol initiated in the background."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
